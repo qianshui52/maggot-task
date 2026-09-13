@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Body: a segmented larva arching across the safe zone. -->
+    <path
+        android:fillColor="#E9D9A3"
+        android:pathData="M25,66 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z" />
+    <path
+        android:fillColor="#E9D9A3"
+        android:pathData="M33,62 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z" />
+    <path
+        android:fillColor="#E9D9A3"
+        android:pathData="M42.5,57 a10.5,10.5 0 1,0 21,0 a10.5,10.5 0 1,0 -21,0 Z" />
+    <path
+        android:fillColor="#E9D9A3"
+        android:pathData="M53,52 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z" />
+    <path
+        android:fillColor="#D8C486"
+        android:pathData="M63.5,47 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0 Z" />
+
+    <!-- Head -->
+    <path
+        android:fillColor="#C4A85F"
+        android:pathData="M72.5,43 a6.5,6.5 0 1,0 13,0 a6.5,6.5 0 1,0 -13,0 Z" />
+
+    <!-- Mouth hooks -->
+    <path
+        android:fillColor="#2A1F10"
+        android:pathData="M84.6,40.2 L88.4,38.6 L88.4,41.0 Z" />
+    <path
+        android:fillColor="#2A1F10"
+        android:pathData="M84.6,45.8 L88.4,47.4 L88.4,45.0 Z" />
+
+    <!-- Segment creases -->
+    <path
+        android:strokeColor="#00000000"
+        android:fillColor="#00000000"
+        android:pathData="M0,0" />
+    <path
+        android:strokeWidth="2.2"
+        android:strokeColor="#B79A55"
+        android:strokeLineCap="round"
+        android:pathData="M43,52.5 L43,67.5" />
+    <path
+        android:strokeWidth="2.2"
+        android:strokeColor="#B79A55"
+        android:strokeLineCap="round"
+        android:pathData="M53,47.5 L53,63.5" />
+    <path
+        android:strokeWidth="2.2"
+        android:strokeColor="#B79A55"
+        android:strokeLineCap="round"
+        android:pathData="M63,42.5 L63,58.5" />
+</vector>

@@ -1,0 +1,23 @@
+<Window x:Class="MaggotTask.View.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="蛆虫任务 · 虫群"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Focusable="False"
+        ShowActivated="False"
+        WindowStartupLocation="Manual"
+        SnapsToDevicePixels="False"
+        UseLayoutRounding="False"
+        IsHitTestVisible="False"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <!-- 整个虚拟桌面都被这块透明画布覆盖；虫群由 CompositionTarget.Rendering 驱动自绘。 -->
+    <Canvas x:Name="RootCanvas" Background="Transparent" />
+
+</Window>

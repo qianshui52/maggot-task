@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>MaggotTask</RootNamespace>
+    <AssemblyName>MaggotTask</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>蛆虫任务</Product>
+    <AssemblyTitle>蛆虫任务 Maggot Task</AssemblyTitle>
+    <Description>反拖延桌面虫群 · 生命周期引擎 v1.0</Description>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+    <CodePage>65001</CodePage>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- No NuGet packages: framework only. -->
+    <RestorePackages>false</RestorePackages>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WinForms 互操作需要它；WPF 覆盖层要按显示器 DPI 铺满整个虚拟桌面。 -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <DebugType>portable</DebugType>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fonts ship as embedded WPF resources; they are compiled into the assembly. -->
+    <Resource Include="Assets\Fonts\*.ttf" />
+  </ItemGroup>
+
+</Project>

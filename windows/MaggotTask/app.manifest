@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="MaggotTask.app" />
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+
+  <!--
+    高 DPI 设置由项目属性 ApplicationHighDpiMode=PerMonitorV2 生成
+    （见 MaggotTask.csproj）。manifest 里重复声明会触发 WFAC010 警告，
+    因此这里只保留 supportedOS。
+  -->
+</assembly>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 注意：资源名不能是 Java 保留字，所以叫 maggot_void 而不是 void。 -->
+    <color name="maggot_void">#FF070906</color>
+    <color name="ic_launcher_background">#FF0C100A</color>
+</resources>

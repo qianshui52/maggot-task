@@ -1,0 +1,16 @@
+﻿[
+    {
+        "family":  "Space Grotesk",
+        "weight":  400,
+        "file":  "SpaceGrotesk-400.ttf",
+        "bytes":  69588,
+        "kind":  "unknown(d40f0100)"
+    },
+    {
+        "family":  "JetBrains Mono",
+        "weight":  400,
+        "file":  "JetBrainsMono-400.ttf",
+        "bytes":  112404,
+        "kind":  "unknown(14b70100)"
+    }
+]

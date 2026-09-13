@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">蛆虫任务</string>
+    <string name="app_subtitle">Maggot Task</string>
+
+    <string name="channel_alert_name">烂尾警报</string>
+    <string name="channel_alert_desc">任务彻底烂尾变成苍蝇时提醒你</string>
+    <string name="channel_service_name">虫群运行中</string>
+    <string name="channel_service_desc">保持虫群在桌面上活动</string>
+</resources>

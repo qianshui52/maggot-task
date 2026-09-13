@@ -1,0 +1,92 @@
+<Window x:Class="MaggotTask.View.HoverBubbleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="蛆虫任务 · 悬停信息"
+        SizeToContent="WidthAndHeight"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ShowActivated="False"
+        Focusable="False"
+        IsHitTestVisible="False"
+        WindowStartupLocation="Manual"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <!-- 外层留 8px 给投影；气泡本体不参与命中测试（规格 §14.4 验收 5） -->
+    <Grid Margin="8" IsHitTestVisible="False">
+        <Border CornerRadius="14" Background="#55000000" Margin="0,3,0,0">
+            <Border.Effect>
+                <BlurEffect Radius="10" RenderingBias="Quality" />
+            </Border.Effect>
+        </Border>
+
+        <Border Background="{StaticResource SurfaceHiBrush}"
+                BorderBrush="{StaticResource BorderHiBrush}"
+                BorderThickness="1"
+                CornerRadius="14"
+                MaxWidth="320">
+            <StackPanel Margin="12,10,12,10">
+
+                <TextBlock x:Name="TitleText"
+                           Style="{StaticResource TextBody}"
+                           FontWeight="SemiBold"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="288" />
+
+                <Border Style="{StaticResource HairLine}" Margin="0,8,0,8" />
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="阶段"
+                               Style="{StaticResource TextLabel}" Margin="0,0,12,0" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="StageText"
+                               Style="{StaticResource TextData}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="腐烂"
+                               Style="{StaticResource TextLabel}" Margin="0,4,12,0" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RotText"
+                               Style="{StaticResource TextData}" Margin="0,4,0,0" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="放置"
+                               Style="{StaticResource TextLabel}" Margin="0,4,12,0" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="PlacedValueText"
+                               Style="{StaticResource TextData}" Margin="0,4,0,0" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="每日"
+                               Style="{StaticResource TextLabel}" Margin="0,4,12,0"
+                               x:Name="DailyLabel" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DailyText"
+                               Style="{StaticResource TextData}" Margin="0,4,0,0"
+                               Foreground="{StaticResource WarnBrush}"
+                               TextWrapping="Wrap" />
+
+                    <!-- 「每周」行只在每周实例上显示（规格 §15.5：逾期显示为「已逾期 N 周」） -->
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="每周"
+                               Style="{StaticResource TextLabel}" Margin="0,4,12,0"
+                               x:Name="WeeklyLabel" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" x:Name="WeeklyText"
+                               Style="{StaticResource TextData}" Margin="0,4,0,0"
+                               Foreground="{StaticResource WarnBrush}"
+                               TextWrapping="Wrap" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

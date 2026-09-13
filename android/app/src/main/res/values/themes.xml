@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 启动主题：应用界面完全由 Compose 绘制，这里只负责窗口底色不出白闪。 -->
+    <style name="Theme.MaggotTask" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/maggot_void</item>
+        <item name="android:statusBarColor">@color/maggot_void</item>
+        <item name="android:navigationBarColor">@color/maggot_void</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

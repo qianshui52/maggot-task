@@ -1,0 +1,319 @@
+<Window x:Class="MaggotTask.View.ControlPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:MaggotTask.View"
+        Title="蛆虫任务 · 控制面板"
+        Width="348"
+        SizeToContent="Height"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <Window.Resources>
+        <v:RatioToGridLengthConverter x:Key="RatioToStar" />
+        <v:RatioToPercentConverter x:Key="RatioToPercent" />
+        <v:StageBrushConverter x:Key="StageBrush" />
+    </Window.Resources>
+
+    <!-- 外层留出 16px 给投影（AllowsTransparency 下窗口本身没有系统投影） -->
+    <Grid Margin="16">
+        <!-- 投影层 -->
+        <Border CornerRadius="24" Background="#66000000" Margin="0,8,0,0">
+            <Border.Effect>
+                <BlurEffect Radius="18" RenderingBias="Quality" />
+            </Border.Effect>
+        </Border>
+
+        <!-- 面板本体 -->
+        <Border Background="{StaticResource DeepBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="24">
+            <StackPanel>
+
+                <!-- ============ 1. 标题行（标题文字是拖动手柄，按钮不是） ============ -->
+                <!--
+                  拖动**只**挂在左边的标题文字上（规格反馈：面板开了之后必须有收起按钮）。
+                  按钮在独立的一列里，既不与拖动手柄重叠、也不在它的可视子树内 ——
+                  点按钮绝对不会被当成拖动，而标题那一块依然可以拖。
+                  「标本缸 01」移到状态行（面板宽 348，标题行必须给按钮留够位置，
+                  否则在 100% DPI 下会被裁掉）。
+                -->
+                <Border Background="Transparent">
+                    <Grid Margin="20,12,16,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 拖动手柄：一整条（含状态点），按钮在右边独立列里 -->
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    Cursor="SizeAll"
+                                    MouseLeftButtonDown="OnDragHandleMouseDown"
+                                    ToolTip="按住这里拖动面板">
+                            <TextBlock Text="蛆虫任务"
+                                       Style="{StaticResource TextH1}"
+                                       VerticalAlignment="Center" />
+                            <!-- 运行状态点：绿=运行 / 灰=暂停 -->
+                            <Border Width="12" Height="12"
+                                    CornerRadius="6"
+                                    Margin="10,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Background="{Binding StatusDotBrush}"
+                                    ToolTip="{Binding StatusText}" />
+                        </StackPanel>
+
+                        <!-- 次要动作：收起面板 / 打开任务列表（ghost，视觉上从属于主行动；热区 ≥ 28×28） -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="收起"
+                                    Style="{StaticResource GhostButton}"
+                                    MinWidth="52" MinHeight="32" Height="32"
+                                    Padding="10,0" FontSize="13"
+                                    Click="OnHidePanelClick"
+                                    ToolTip="把控制面板收起来（可从托盘「显示/隐藏控制面板」再唤出）" />
+                            <Button Content="任务列表"
+                                    Style="{StaticResource GhostButton}"
+                                    MinWidth="72" MinHeight="32" Height="32"
+                                    Padding="10,0" FontSize="13"
+                                    Margin="8,0,0,0"
+                                    Click="OnOpenTaskListClick"
+                                    ToolTip="打开完整的任务控制台" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource HairLine}" Margin="20,0,20,0" />
+
+                <!-- ============ 2. 数字条：卵 / 蛆 / 蛹 / 苍蝇 ============ -->
+                <Border Style="{StaticResource PanelCard}"
+                        Background="{StaticResource SurfaceBrush}"
+                        Margin="16,16,16,0"
+                        Padding="12,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                         Fill="{StaticResource EggBrush}" />
+                                <TextBlock Text="卵" Style="{StaticResource TextLabel}"
+                                           Margin="6,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding EggCount}"
+                                       Style="{StaticResource TextDataStrong}"
+                                       FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                         Fill="{StaticResource LarvaBrush}" />
+                                <TextBlock Text="蛆" Style="{StaticResource TextLabel}"
+                                           Margin="6,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding LarvaCount}"
+                                       Style="{StaticResource TextDataStrong}"
+                                       FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                         Fill="{StaticResource PupaBrush}" />
+                                <TextBlock Text="蛹" Style="{StaticResource TextLabel}"
+                                           Margin="6,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding PupaCount}"
+                                       Style="{StaticResource TextDataStrong}"
+                                       FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                         Fill="{StaticResource FlyRimBrush}" />
+                                <TextBlock Text="苍蝇" Style="{StaticResource TextLabel}"
+                                           Margin="6,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding FlyCount}"
+                                       Style="{StaticResource TextDataStrong}"
+                                       FontSize="18" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ============ 3. 腐烂压力条 ============ -->
+                <StackPanel Margin="16,14,16,0">
+                    <Grid>
+                        <TextBlock Text="腐烂压力" Style="{StaticResource TextLabel}"
+                                   HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource TextData}"
+                                   HorizontalAlignment="Right">
+                            <Run Text="整体平均 " />
+                            <Run Text="{Binding AverageRotText, Mode=OneWay}" />
+                        </TextBlock>
+                    </Grid>
+
+                    <Border Height="10" CornerRadius="5" Margin="0,6,0,0"
+                            Background="{StaticResource TrackBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            ClipToBounds="True">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding EggRatio, Converter={StaticResource RatioToStar}}" />
+                                <ColumnDefinition Width="{Binding LarvaRatio, Converter={StaticResource RatioToStar}}" />
+                                <ColumnDefinition Width="{Binding PupaRatio, Converter={StaticResource RatioToStar}}" />
+                                <ColumnDefinition Width="{Binding FlyRatio, Converter={StaticResource RatioToStar}}" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="0" Fill="{StaticResource EggBrush}" />
+                            <Rectangle Grid.Column="1" Fill="{StaticResource LarvaBrush}" />
+                            <Rectangle Grid.Column="2" Fill="{StaticResource PupaBrush}" />
+                            <Rectangle Grid.Column="3" Fill="{StaticResource FlyRimBrush}" />
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Text="{Binding StatusRowText}"
+                               Style="{StaticResource TextData}"
+                               Margin="0,6,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="NoWrap"
+                               ToolTip="{Binding StatusRowText}" />
+                </StackPanel>
+
+                <!-- ============ 4. 主行动：启动 / 暂停 ============ -->
+                <Button Content="{Binding RunButtonText}"
+                        Command="{Binding RunCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        Height="44"
+                        Margin="16,16,16,0" />
+
+                <!-- ============ 5. 腐化倍速 ============ -->
+                <Grid Margin="16,16,16,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="腐化倍速" Style="{StaticResource TextLabel}"
+                               HorizontalAlignment="Left" />
+                    <TextBlock Grid.Row="0" Text="{Binding RotSpeedText}" Style="{StaticResource TextDataStrong}"
+                               HorizontalAlignment="Right" />
+                    <Slider Grid.Row="1"
+                            Style="{StaticResource RotSpeedSlider}"
+                            Minimum="0.25" Maximum="8.0"
+                            SmallChange="0.05" LargeChange="0.25"
+                            Value="{Binding RotSpeed, Mode=TwoWay}"
+                            Margin="0,6,0,0"
+                            ToolTip="0.25× – 8.0×（对数刻度）" />
+                </Grid>
+
+                <!-- ============ 6. 次级行动：新建 / 重置 / 清空 ============ -->
+                <Grid Margin="16,16,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="新建任务" Style="{StaticResource BaseButton}"
+                            Command="{Binding NewTaskCommand}" />
+                    <Button Grid.Column="2" Content="重置" Style="{StaticResource GhostButton}"
+                            Command="{Binding ResetCommand}"
+                            ToolTip="所有任务 rot 归零，苍蝇退回卵；不删任务" />
+                    <Button Grid.Column="4" Content="清空" Style="{StaticResource DangerButton}"
+                            Command="{Binding ClearCommand}"
+                            ToolTip="永久删除全部任务（需二次确认）" />
+                </Grid>
+
+                <!-- ============ 7. 开关行：穿透 / 音效 / 通知 ============ -->
+                <Grid Margin="16,12,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0" Content="穿透" Style="{StaticResource ToggleSwitch}"
+                              IsChecked="{Binding ClickThrough, Mode=TwoWay}"
+                              ToolTip="关闭后虫群层吃掉点击，可以直接拍" />
+                    <CheckBox Grid.Column="1" Content="音效" Style="{StaticResource ToggleSwitch}"
+                              IsChecked="{Binding SoundEnabled, Mode=TwoWay}"
+                              ToolTip="程序化合成的音效；打开时会立刻试听一次「拍死」" />
+                    <CheckBox Grid.Column="2" Content="通知" Style="{StaticResource ToggleSwitch}"
+                              IsChecked="{Binding NotifyOnFly, Mode=TwoWay}" />
+                </Grid>
+
+                <!-- ============ 7b. 每日任务总开关（规格 §12.4） ============ -->
+                <Grid Margin="16,4,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0" Content="每日任务" Style="{StaticResource ToggleSwitch}"
+                              IsChecked="{Binding DailyEnabled, Mode=TwoWay}"
+                              ToolTip="关闭后完全不生成新的每日实例；已有实例照常腐烂" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding DailySummaryText}"
+                               Style="{StaticResource TextData}"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               TextTrimming="CharacterEllipsis" />
+                </Grid>
+
+                <!-- ============ 7c. 每周任务总开关（规格 §15.5 → §12.4） ============ -->
+                <Grid Margin="16,4,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Grid.Column="0" Content="每周任务" Style="{StaticResource ToggleSwitch}"
+                              IsChecked="{Binding WeeklyEnabled, Mode=TwoWay}"
+                              ToolTip="关闭后完全不生成新的每周实例；已有实例照常腐烂" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding WeeklySummaryText}"
+                               Style="{StaticResource TextData}"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               TextTrimming="CharacterEllipsis" />
+                </Grid>
+
+                <!-- ============ 底部状态 ============ -->
+                <Border Style="{StaticResource HairLine}" Margin="20,14,20,0" />
+                <TextBlock Text="{Binding FooterText}"
+                           Style="{StaticResource TextData}"
+                           Margin="20,10,20,16"
+                           TextTrimming="CharacterEllipsis" />
+
+                <!--
+                  字体预热（不可见、不占位、不参与命中测试）：
+                  强制 WPF 用「Space Grotesk 主族 + Microsoft YaHei UI 回退」渲染一段中文，
+                  以便运行期验证中文确实回退成功、资源字体确实被加载。
+                  字体缺失时 WPF 只会静默回退，这行是唯一的实证手段。
+                -->
+                <TextBlock x:Name="FontWarmup"
+                           Text="蛆虫任务 · 腐烂度 · 苍蝇 · 标本缸"
+                           FontFamily="{StaticResource DisplayFont}"
+                           FontSize="15"
+                           Width="0" Height="0"
+                           Opacity="0"
+                           IsHitTestVisible="False"
+                           Focusable="False" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

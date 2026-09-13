@@ -1,0 +1,38 @@
+# ───────── Android / Gradle ─────────
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.iml
+*.hprof
+.kotlin/
+
+# Keystore: checked in on purpose so the release APK is reproducible and
+# sideloadable. Replace it with your own before publishing anywhere.
+# (Do NOT add maggot-shared.keystore here.)
+
+# ───────── Windows / .NET ─────────
+windows/**/bin/
+windows/**/obj/
+windows/.vs/
+*.user
+*.suo
+*.userprefs
+
+# ───────── Build outputs ─────────
+dist/*.apk
+dist/*.zip
+
+# ───────── OS / editor ─────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# ───────── 本地智能体工作区（不属于项目）─────────
+.workbuddy/
+dsh-session-*.zip
