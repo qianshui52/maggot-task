@@ -368,6 +368,26 @@ public partial class App : System.Windows.Application, IAppHost
             };
         }
 
+        // --flysheet=<path.png>：把当前画法按 1×/2×/3×、浅底/深底排成一张标尺图后退出。
+        // 不碰状态文件、不开窗口 —— 改画法时的标尺。
+        // 可选 --stage=<egg|larva|pupa|fly> 指定阶段（默认苍蝇）。
+        string? sheetArg = e.Args.FirstOrDefault(a => a.StartsWith("--flysheet=", StringComparison.OrdinalIgnoreCase));
+        if (sheetArg is not null)
+        {
+            string outPath = sheetArg["--flysheet=".Length..].Trim().Trim('"');
+            Stage sheetStage = (stageArg?["--stage=".Length..].Trim().ToLowerInvariant()) switch
+            {
+                "egg" => Stage.Egg,
+                "larva" => Stage.Larva,
+                "pupa" => Stage.Pupa,
+                _ => Stage.Fly,
+            };
+            string report = StyleSheet.Render(outPath, sheetStage);
+            File.WriteAllText(outPath + ".txt", report);
+            Environment.Exit(0);
+            return;
+        }
+
         try
         {
             Bootstrap(smoke);

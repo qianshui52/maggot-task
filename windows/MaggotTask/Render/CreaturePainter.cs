@@ -174,7 +174,10 @@ public static class CreaturePainter
                 // 本体 0.42s × 0.756s
                 w = 0.52 * s; h = 0.86 * s; rotate = false; break;
             default: // Fly
-                w = 1.45 * s; h = 0.70 * s; rotate = true; break;
+                // 翅向两侧张开后翼展 ≈ 体长（真实蝇就是这样）。阴影取 1.10s 的折中：
+                // 完全按翼展(1.40s)会变成一团近乎正圆的大黑斑，只覆盖体干(0.70s)
+                // 又会缩在翅膀下面。1.10s 读起来是"虫体+翅"的合成投影。
+                w = 1.45 * s; h = 1.10 * s; rotate = true; break;
         }
 
         // 呼吸/蠕动轻微带动阴影，静态阴影会显得贴纸感过强。
@@ -441,7 +444,7 @@ public static class CreaturePainter
     }
 
     // ------------------------------------------------------------------
-    // 苍蝇 FLY —— 腹部 + 胸部 + 头 + 复眼 + 双翅 + 6 腿
+    // 苍蝇 FLY（卡通）—— 腹部 + 胸部 + 头 + 复眼 + 双翅 + 6 腿
     // ------------------------------------------------------------------
     private static void DrawFly(DrawingContext dc, CreatureVisual c, double time, bool reduceMotion)
     {
@@ -492,8 +495,12 @@ public static class CreaturePainter
 
         dc.Pop(); // transform
 
-        // 翅：扇形拍动 scaleY = |sin(t*42 + seed)|，最小 0.18
-        // 翅的拍动不跟随躯干朝向，单独一次旋转。
+        // ── 翅：从胸部两侧"铰接"向外后张开
+        //
+        // 旧版把翅当成两颗贴着背脊的长椭圆（长轴与体轴几乎平行、只转 ±24°），
+        // 于是两只翅尖在尾部互相靠近，看起来像"向内收拢的叶片"——很别扭。
+        // 现在改成绕**翅根**旋转：根在胸部两侧，翅身沿局部 +X 向外后伸展，
+        // 拍动时张开角在 ~114° ↔ ~94° 之间摆动（顶视下就是"扇"）。
         double flap;
         if (reduceMotion)
         {
@@ -505,23 +512,28 @@ public static class CreaturePainter
             if (flap < 0.18) flap = 0.18;
         }
 
-        dc.PushTransform(new RotateTransform(deg, c.Position.X, c.Position.Y));
+        const double wingLen = 0.56;   // 相对 s
+        double wingWid = 0.25 * (1.10 - 0.50 * flap); // 抬起时顶视投影变窄
 
-        double wingLen = 0.62 * s;
-        double wingWid = 0.26 * s;
         for (int side = -1; side <= 1; side += 2)
         {
-            Point wingCenter = new(
-                c.Position.X - 0.16 * s,
-                c.Position.Y + side * wingLen * 0.5 * flap);
-            double rx = wingLen * 0.5;
-            double ry = wingWid * 0.5 * flap;
+            // 翅根在**胸部**两侧（偏前）：根放太后，翅身会横压在胖腹部上，像两片花瓣。
+            Point root = new(c.Position.X + 0.01 * s, c.Position.Y + side * 0.13 * s);
 
-            dc.PushTransform(new RotateTransform(side * (14.0 + 10.0 * flap), c.Position.X - 0.16 * s, c.Position.Y));
-            dc.DrawEllipse(Palette.WingGradient, FlyRimPen, wingCenter, rx, ry);
-            dc.Pop();
+            dc.PushTransform(new RotateTransform(deg, c.Position.X, c.Position.Y));
+            // 128° ≈ 向后外侧张开成 V 字（纯侧向 90°、纯向后 180°）；
+            // 拍动时向前扫 16°，读起来就是"扇翅"。
+            dc.PushTransform(new RotateTransform(side * (128.0 - 16.0 * flap), root.X, root.Y));
+            dc.PushTransform(new TranslateTransform(root.X, root.Y));
+            dc.DrawEllipse(
+                Palette.WingGradient,
+                FlyRimPen,
+                new Point(wingLen * s * 0.5, 0),
+                wingLen * s * 0.5,
+                wingWid * s * 0.5);
+            dc.Pop(); // translate
+            dc.Pop(); // 张开角
+            dc.Pop(); // 体轴朝向
         }
-
-        dc.Pop(); // transform
     }
 }
