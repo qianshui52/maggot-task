@@ -36,3 +36,6 @@ desktop.ini
 # ───────── 本地智能体工作区（不属于项目）─────────
 .workbuddy/
 dsh-session-*.zip
+
+# 图标生成器的报告文件（生成到哪儿就写在哪儿旁边）
+*.ico.txt

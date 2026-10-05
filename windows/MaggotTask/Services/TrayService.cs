@@ -1,8 +1,11 @@
+using MaggotTask.Render;
+
 namespace MaggotTask.Services;
 
 /// <summary>
 /// 系统托盘图标（System.Windows.Forms.NotifyIcon）。
-/// 图标由 <see cref="TrayIconFactory"/> 程序化生成，不引用外部 .ico 文件。
+/// 图标优先取嵌入的应用图标（Assets\maggot.ico 的 32px 帧，与 exe 图标同一份），
+/// 读不到时退回 <see cref="TrayIconFactory"/> 的程序化绘制 —— 两处都不引用外部文件。
 /// </summary>
 public sealed class TrayService : IDisposable
 {
@@ -12,7 +15,7 @@ public sealed class TrayService : IDisposable
 
     public TrayService()
     {
-        _ownedIcon = TrayIconFactory.Create(32);
+        _ownedIcon = AppIconFactory.LoadTrayIcon(32) ?? TrayIconFactory.Create(32);
 
         _icon = new System.Windows.Forms.NotifyIcon
         {

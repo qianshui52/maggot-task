@@ -27,6 +27,9 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <DebugType>portable</DebugType>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <!-- 应用图标：由 AppIconFactory 程序化生成（9 个尺寸 16..256，≤64 走 DIB、128/256 走 PNG）。
+         重新生成：MaggotTask.exe "appicon=Assets\maggot.ico"（参数前缀为两个连字符）。 -->
+    <ApplicationIcon>Assets\maggot.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,6 +42,8 @@
   <ItemGroup>
     <!-- Fonts ship as embedded WPF resources; they are compiled into the assembly. -->
     <Resource Include="Assets\Fonts\*.ttf" />
+    <!-- 同一份 .ico 也作为 WPF 资源嵌入：托盘图标直接取 32px 帧，避免两处画法漂移。 -->
+    <Resource Include="Assets\maggot.ico" />
   </ItemGroup>
 
 </Project>

@@ -368,6 +368,20 @@ public partial class App : System.Windows.Application, IAppHost
             };
         }
 
+        // --appicon=<path.ico>：程序化生成多尺寸应用图标（可选 --preview=<dir> 导出 PNG）后退出。
+        // 图标是静态资源：生成一次、提交进仓库、由 csproj 的 ApplicationIcon 引用。
+        string? iconArg = e.Args.FirstOrDefault(a => a.StartsWith("--appicon=", StringComparison.OrdinalIgnoreCase));
+        if (iconArg is not null)
+        {
+            string icoPath = iconArg["--appicon=".Length..].Trim().Trim('"');
+            string? previewArg = e.Args.FirstOrDefault(a => a.StartsWith("--preview=", StringComparison.OrdinalIgnoreCase));
+            string? preview = previewArg?["--preview=".Length..].Trim().Trim('"');
+            string report = AppIconFactory.Write(icoPath, preview);
+            File.WriteAllText(icoPath + ".txt", report);
+            Environment.Exit(0);
+            return;
+        }
+
         // --flysheet=<path.png>：把当前画法按 1×/2×/3×、浅底/深底排成一张标尺图后退出。
         // 不碰状态文件、不开窗口 —— 改画法时的标尺。
         // 可选 --stage=<egg|larva|pupa|fly> 指定阶段（默认苍蝇）。
@@ -463,11 +477,13 @@ public partial class App : System.Windows.Application, IAppHost
 
         // 6) 窗口
         _overlay = new OverlayWindow { ReduceMotion = ReduceMotion };
+        ApplyAppIcon(_overlay);
         _overlay.CreatureSquashed += OnCreatureSquashed;
         _overlay.Show();
         _overlay.ApplyClickThrough(_state.Config.ClickThrough);
 
         _panel = new ControlPanelWindow(this, _state.PanelLeft, _state.PanelTop);
+        ApplyAppIcon(_panel);
         _panel.PositionChanged += (l, t) =>
         {
             _state.PanelLeft = l;
@@ -483,6 +499,7 @@ public partial class App : System.Windows.Application, IAppHost
             CollectHoverTargets,
             CurrentCursorLocal,
             () => _clock.Elapsed.TotalSeconds);
+        ApplyAppIcon(_hoverBubble);
         _hoverBubble.Show();
         _hoverBubble.Hide();
 
@@ -794,6 +811,23 @@ public partial class App : System.Windows.Application, IAppHost
         _tray.SetPanelVisible(_panel?.IsVisible ?? false);
     }
 
+    /// <summary>
+    /// 给窗口挂应用图标（任务栏 / Alt-Tab / 标题栏）。
+    /// 图标取自嵌入资源，取不到就静默跳过 —— 图标永远不该成为启动失败的 reason。
+    /// </summary>
+    private static void ApplyAppIcon(Window window)
+    {
+        try
+        {
+            ImageSource? icon = AppIconFactory.LoadImageSource();
+            if (icon is not null) window.Icon = icon;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MaggotTask] 应用图标加载失败: {ex.Message}");
+        }
+    }
+
     private void ShowPanel()
     {
         if (_panel is null) return;
@@ -829,6 +863,7 @@ public partial class App : System.Windows.Application, IAppHost
         if (_taskList is null)
         {
             _taskList = new TaskListWindow(this);
+            ApplyAppIcon(_taskList);
             _taskList.Closed += (_, _) => _taskList = null;
             SubscribeViewRefresh(() => _taskList?.ViewModel.Refresh());
         }
