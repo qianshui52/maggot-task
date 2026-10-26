@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using MaggotTask.Render;
 using MaggotTask.Services;
 using MaggotTask.View;
 
@@ -64,6 +65,11 @@ public static class SelfTest
         LegacyV2StateLoadsCleanly();
 
         SimulationPacerBehaviour();
+
+        // ---- v1.3 新增：元游戏（货币 / 商店 / 连胜 / 勋章）----
+        GameProgressBehaviour();
+        KillGeometryBehaviour();
+        CursorEncodingBehaviour();
 
         Log.AppendLine();
         Log.AppendLine($"─── 结果：{_passed} 通过 / {_failed} 失败 ───");
@@ -1922,7 +1928,7 @@ public static class SelfTest
                 linst is { Rot: 0.55f, Status: TaskStatus.Doing },
                 linst is null ? "未找到" : $"rot={linst.Rot} status={linst.Status}");
             Check("WeeklyEnabled 往返一致", loaded.Config.WeeklyEnabled == false);
-            Check("写盘版本号 = 3", loaded.Version == 3, $"实际 {loaded.Version}");
+            Check($"写盘版本号 = {AppState.CurrentVersion}", loaded.Version == AppState.CurrentVersion, $"实际 {loaded.Version}");
 
             // 载入引擎后继续幂等推进
             LifecycleEngine restored = new(loaded.Config, randomSeed: 359);
@@ -2042,7 +2048,7 @@ public static class SelfTest
             Check("v2 的 squashedCount / 面板位置照常读出来",
                 state.SquashedCount == 1 && state.PanelLeft is not null,
                 $"squashed={state.SquashedCount} panelLeft={state.PanelLeft}");
-            Check("加载后版本号提升到当前版本 3", state.Version == 3, $"实际 {state.Version}");
+            Check($"加载后版本号提升到当前版本 {AppState.CurrentVersion}", state.Version == AppState.CurrentVersion, $"实际 {state.Version}");
 
             // 载入引擎：v2 数据照常跑，且能接着做每周任务
             LifecycleEngine engine = new(state.Config, randomSeed: 361);
@@ -2069,13 +2075,14 @@ public static class SelfTest
             string written = File.ReadAllText(AppPaths.StateFile);
             bool v2HasWeeklyTemplates = written.Contains("weeklyTemplates", StringComparison.OrdinalIgnoreCase);
             bool v2HasWeeklyEnabled = written.Contains("weeklyEnabled", StringComparison.OrdinalIgnoreCase);
-            bool v2Version3 = System.Text.RegularExpressions.Regex.IsMatch(written, "\"version\"\\s*:\\s*3\\b",
+            bool v2Version3 = System.Text.RegularExpressions.Regex.IsMatch(
+                written, "\"version\"\\s*:\\s*" + AppState.CurrentVersion + "\\b",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             Check("重新落盘后含 weeklyTemplates 键", v2HasWeeklyTemplates,
                 $"weeklyTemplates={v2HasWeeklyTemplates}");
             Check("重新落盘后含 weeklyEnabled 键", v2HasWeeklyEnabled,
                 $"weeklyEnabled={v2HasWeeklyEnabled}");
-            Check("重新落盘后版本号为 3", v2Version3, $"version==3: {v2Version3}");
+            Check($"重新落盘后版本号为 {AppState.CurrentVersion}", v2Version3, $"version={AppState.CurrentVersion}: {v2Version3}");
         }
         catch (Exception ex)
         {
@@ -2153,7 +2160,7 @@ public static class SelfTest
                 linst is { Rot: 0.55f, Status: TaskStatus.Doing },
                 linst is null ? "未找到" : $"rot={linst.Rot} status={linst.Status}");
             Check("DailyEnabled 往返一致", loaded.Config.DailyEnabled == false);
-            Check("写盘版本号 = 3", loaded.Version == 3, $"实际 {loaded.Version}");
+            Check($"写盘版本号 = {AppState.CurrentVersion}", loaded.Version == AppState.CurrentVersion, $"实际 {loaded.Version}");
         }
         catch (Exception ex)
         {
@@ -2260,7 +2267,7 @@ public static class SelfTest
                 $"squashed={state.SquashedCount} panelLeft={state.PanelLeft}");
 
             // 版本号升级到当前版本（只是标记，数据本身不受影响）
-            Check("加载后版本号提升到当前版本 3", state.Version == 3, $"实际 {state.Version}");
+            Check($"加载后版本号提升到当前版本 {AppState.CurrentVersion}", state.Version == AppState.CurrentVersion, $"实际 {state.Version}");
 
             // 加载后引擎能正常接收
             LifecycleEngine engine = new(state.Config, randomSeed: 257);
@@ -2279,7 +2286,8 @@ public static class SelfTest
             bool v1HasWeeklyTemplates = written.Contains("weeklyTemplates", StringComparison.OrdinalIgnoreCase);
             bool v1HasWeeklyKey = written.Contains("weeklyKey", StringComparison.OrdinalIgnoreCase);
             bool v1HasWeeklyEnabled = written.Contains("weeklyEnabled", StringComparison.OrdinalIgnoreCase);
-            bool v1Version3 = System.Text.RegularExpressions.Regex.IsMatch(written, "\"version\"\\s*:\\s*3\\b",
+            bool v1Version3 = System.Text.RegularExpressions.Regex.IsMatch(
+                written, "\"version\"\\s*:\\s*" + AppState.CurrentVersion + "\\b",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             Check("重新落盘后含 dailyTemplates 键",
                 written.Contains("dailyTemplates", StringComparison.OrdinalIgnoreCase), "(缺少该键)");
@@ -2288,7 +2296,7 @@ public static class SelfTest
             Check("重新落盘后含 weeklyTemplates 键", v1HasWeeklyTemplates,
                 $"weeklyTemplates={v1HasWeeklyTemplates}");
             Check("重新落盘后含 weeklyKey 键", v1HasWeeklyKey, $"weeklyKey={v1HasWeeklyKey}");
-            Check("重新落盘后版本号为 3", v1Version3, $"version==3: {v1Version3}");
+            Check($"重新落盘后版本号为 {AppState.CurrentVersion}", v1Version3, $"version={AppState.CurrentVersion}: {v1Version3}");
             Check("重新落盘后含 dailyEnabled 键",
                 written.Contains("dailyEnabled", StringComparison.OrdinalIgnoreCase), "(缺少该键)");
             Check("重新落盘后含 weeklyEnabled 键", v1HasWeeklyEnabled,
@@ -2719,5 +2727,218 @@ public static class SelfTest
                 Debug.WriteLine($"还原 state.json 失败: {ex.Message}");
             }
         }
+    }
+
+    // ==================================================================
+    // 元游戏：货币 / 商店 / 连胜 / 勋章
+    //
+    // 这一组断言的意义：四个系统（奖励、商店、连胜、勋章）读的是同一份
+    // GameProgress 字段。任何一处口径漂移（例如给工具加个倍率、
+    // 或者连胜按"击杀数"而不是"活跃日"算）都会在这里立刻红。
+    // ==================================================================
+
+    private static void GameProgressBehaviour()
+    {
+        Section("元游戏：奖励 / 商店 / 连胜 / 勋章");
+
+        // ---- 1. 奖励表（用户指定：卵 100 / 蛆 50 / 苍蝇 10；蛹按单调性取 25）----
+        Eq("奖励 · 卵 100", ToolCatalog.RewardFor(Stage.Egg), 100);
+        Eq("奖励 · 蛆 50", ToolCatalog.RewardFor(Stage.Larva), 50);
+        Eq("奖励 · 蛹 25", ToolCatalog.RewardFor(Stage.Pupa), 25);
+        Eq("奖励 · 苍蝇 10", ToolCatalog.RewardFor(Stage.Fly), 10);
+        Eq("奖励 · 已完成 0", ToolCatalog.RewardFor(Stage.Dead), 0);
+
+        // ---- 2. 单次击杀记账 ----
+        var p = new GameProgress();
+        int gain = p.RegisterKill(Stage.Egg, "2026-01-01");
+        Eq("击杀卵入账 100", gain, 100);
+        Eq("余额 100", p.Coins, 100);
+        Eq("累计获得 100", p.TotalCoinsEarned, 100);
+        Eq("总击杀 1", p.TotalKills, 1);
+        Eq("卵计数 1", p.KillsEgg, 1);
+        Eq("任务完成 1", p.TasksCompleted, 1);
+        Eq("连胜从 1 开始", p.CurrentStreak, 1);
+        Eq("当天击杀记录", p.DayOrEmpty("2026-01-01").Kills, 1);
+        Eq("当天入账记录", p.DayOrEmpty("2026-01-01").Coins, 100);
+
+        // ---- 3. 同一天多杀不重复记天数 ----
+        p.RegisterKill(Stage.Fly, "2026-01-01");
+        Eq("同日连胜仍为 1", p.CurrentStreak, 1);
+        Eq("余额 110", p.Coins, 110);
+        Eq("当天击杀 2", p.DayOrEmpty("2026-01-01").Kills, 2);
+
+        // ---- 4. 次日续上 ----
+        p.RegisterKill(Stage.Larva, "2026-01-02");
+        Eq("次日连胜 2", p.CurrentStreak, 2);
+        Eq("最长 2", p.BestStreak, 2);
+
+        // ---- 5. 断一天：重新从 1 开始，最长纪录保留 ----
+        p.RegisterKill(Stage.Fly, "2026-01-04");
+        Eq("断档后连胜归 1", p.CurrentStreak, 1);
+        Eq("最长纪录仍是 2", p.BestStreak, 2);
+
+        // ---- 6. 跨天校正：两天没动 → 0，但最长不变 ----
+        p.RefreshStreak("2026-01-06");
+        Eq("两天没活跃 → 连胜 0", p.CurrentStreak, 0);
+        Eq("最长纪录不受影响", p.BestStreak, 2);
+
+        // ---- 7. 昨天活跃、今天还没活跃 → 连胜仍然有效 ----
+        var q = new GameProgress();
+        q.RegisterKill(Stage.Egg, "2026-02-01");
+        q.RefreshStreak("2026-02-02");
+        Eq("昨天活跃 → 连胜不清零", q.CurrentStreak, 1);
+
+        // ---- 8. 商店 ----
+        var shop = new GameProgress { Coins = 999 };
+        Check("货币不足时购买失败", !shop.Buy(ToolCatalog.SprayId, out string reason1), reason1);
+        Check("失败不扣钱", shop.Coins == 999);
+        Check("失败不拥有", !shop.Owns(ToolCatalog.SprayId));
+
+        shop.Coins = 1000;
+        Check("1000 货币可以买喷雾", shop.Buy(ToolCatalog.SprayId, out string reason2), reason2);
+        Eq("购买后余额归零", shop.Coins, 0);
+        Eq("累计支出 1000", shop.TotalSpent, 1000);
+        Check("购买后已拥有", shop.Owns(ToolCatalog.SprayId));
+        Check("购买后自动装备", shop.EquippedTool == ToolCatalog.SprayId);
+        Check("重复购买被拒绝", !shop.Buy(ToolCatalog.SprayId, out _));
+
+        Eq("装备表含两件", shop.OwnedTools.Count, 2);
+
+        // ---- 9. 装备只能选已拥有的 ----
+        Check("不能装备没买的唐太刀", !shop.Equip(ToolCatalog.KatanaId));
+        Check("可以切回苍蝇拍", shop.Equip(ToolCatalog.SwatterId));
+        Check("当前装备是苍蝇拍", shop.EquippedTool == ToolCatalog.SwatterId);
+
+        // ---- 10. 勋章从计数派生 ----
+        var medal = new GameProgress();
+        medal.RegisterKill(Stage.Egg, "2026-03-01");
+        List<MedalDef> fresh = medal.EvaluateMedals("2026-03-01");
+        Check("首杀解锁「第一拍」", fresh.Any(m => m.Id == "first-swat"));
+        Check("重复扫描不会重复解锁", medal.EvaluateMedals("2026-03-01").Count == 0);
+
+        for (int i = 0; i < 9; i++) medal.RegisterKill(Stage.Egg, "2026-03-01");
+        MedalDef eggMedal = GameProgress.MedalCatalog.First(m => m.Id == "egg-breaker");
+        Eq("破壳者进度 = 卵击杀数", medal.MedalValue(eggMedal), 10);
+        Check("破壳者已达成", medal.MedalReached(eggMedal));
+        Near("破壳者进度条 100%", medal.MedalProgress(eggMedal), 1.0, 1e-9);
+
+        // ---- 11. 四象皆斩取四阶段最小值（不能靠单阶段刷）----
+        MedalDef four = GameProgress.MedalCatalog.First(m => m.Id == "all-stages");
+        Eq("只有卵时四象进度为 0", medal.MedalValue(four), 0);
+
+        // ---- 12. 归一化：坏存档也能站起来 ----
+        var dirty = new GameProgress
+        {
+            Coins = -5,
+            CurrentStreak = -3,
+            OwnedTools = new List<string>(),
+            EquippedTool = "not-a-tool",
+        };
+        dirty.Normalize();
+        Eq("负数余额归零", dirty.Coins, 0);
+        Eq("负数连胜归零", dirty.CurrentStreak, 0);
+        Check("苍蝇拍始终拥有", dirty.Owns(ToolCatalog.SwatterId));
+        Check("非法装备退回苍蝇拍", string.Equals(dirty.EquippedTool, ToolCatalog.SwatterId, StringComparison.Ordinal),
+            dirty.EquippedTool);
+
+        // ---- 13. 日历裁剪不会删掉最近的数据 ----
+        var cal = new GameProgress();
+        for (int i = 0; i < 450; i++)
+        {
+            cal.Days[new DateOnly(2026, 1, 1).AddDays(i).ToString("yyyy-MM-dd")] = new DayLog { Kills = 1 };
+        }
+        cal.PruneDays(400);
+        Eq("日历裁剪到 400 天", cal.Days.Count, 400);
+        Check("最近一天被保留", cal.Days.ContainsKey(new DateOnly(2026, 1, 1).AddDays(449).ToString("yyyy-MM-dd")));
+    }
+
+    // ==================================================================
+    // 击杀几何：四件工具各自的命中集合
+    //
+    // 把生物位置钉死在已知坐标上，逐条断言"该中的中了、不该中的没中"。
+    // 这一组能挡住最容易犯的错：换工具时忘了改形状、或者范围算错量级。
+    // ==================================================================
+
+    private static void KillGeometryBehaviour()
+    {
+        Section("击杀几何：四件工具的形状");
+
+        var model = new SwarmModel();
+        model.Bounds = new Rect(0, 0, 1200, 900);
+
+        var tasks = new List<TaskItem>();
+        for (int i = 0; i < 5; i++)
+        {
+            TaskItem t = MakeTask(0f, title: $"几何 {i}");
+            t.Id = $"geo-{i}";
+            tasks.Add(t);
+        }
+        model.Sync(tasks, 0.0);
+
+        // 位置全部钉死（Sync 会把它们丢到屏幕外随机边缘）
+        void Place(int i, double x, double y)
+        {
+            Check($"生物 geo-{i} 存在", model.TryGet($"geo-{i}", out CreatureVisual _));
+            if (model.TryGet($"geo-{i}", out CreatureVisual c)) c.Position = new Point(x, y);
+        }
+
+        Place(0, 100, 300);
+        Place(1, 150, 300);
+        Place(2, 100, 400);
+        Place(3, 800, 700);
+        Place(4, 500, 300);
+
+        static HashSet<string> Ids(List<CreatureVisual> list)
+        {
+            var set = new HashSet<string>(StringComparer.Ordinal);
+            foreach (CreatureVisual c in list) set.Add(c.TaskId);
+            return set;
+        }
+
+        // 单点：只打光标下最近的一只
+        HashSet<string> single = Ids(model.CollectHits(ToolCatalog.Swatter, new Point(102, 301)));
+        Check("苍蝇拍只命中最近的一只", single.Count == 1 && single.Contains("geo-0"),
+            string.Join(",", single));
+
+        // 圆形：130px 内全清（t0/t1 在圈里，t4 在 375px 外）
+        HashSet<string> circle = Ids(model.CollectHits(ToolCatalog.Spray, new Point(125, 300)));
+        Check("喷雾覆盖圈内两只", circle.Contains("geo-0") && circle.Contains("geo-1"), string.Join(",", circle));
+        Check("喷雾不会打到圈外", !circle.Contains("geo-4") && !circle.Contains("geo-3"), string.Join(",", circle));
+
+        // 全屏光带：y≈300 那一行
+        HashSet<string> beam = Ids(model.CollectHits(ToolCatalog.Laser, new Point(600, 300)));
+        Check("激光带命中同一高度的三只",
+            beam.Contains("geo-0") && beam.Contains("geo-1") && beam.Contains("geo-4"), string.Join(",", beam));
+        Check("激光带不会命中另一行", !beam.Contains("geo-2") && !beam.Contains("geo-3"), string.Join(",", beam));
+
+        // 十字：以 (100,350) 为中心的横竖两带
+        HashSet<string> cross = Ids(model.CollectHits(ToolCatalog.Katana, new Point(100, 350)));
+        Check("唐太刀竖带命中正下方", cross.Contains("geo-2"), string.Join(",", cross));
+        Check("唐太刀打不到屏幕另一侧", !cross.Contains("geo-3"), string.Join(",", cross));
+
+        // 空挥：附近什么都没有
+        Check("空白处出手命中 0 只", model.CollectHits(ToolCatalog.Swatter, new Point(1100, 850)).Count == 0);
+    }
+
+    // ==================================================================
+    // 光标编码：手写 CUR 字节流必须能被 WPF 解析
+    //
+    // 这段是纯二进制拼装（ICONDIR / ICONDIRENTRY / DIB / AND 掩码），
+    // 出错时不会有异常，只会"光标变成系统箭头"这种沉默故障 ——
+    // 所以必须有一条断言把"能生成"钉住。
+    // ==================================================================
+
+    private static void CursorEncodingBehaviour()
+    {
+        Section("光标：程序化 CUR 编码");
+
+        foreach (ToolDef tool in ToolCatalog.All)
+        {
+            Cursor? cursor = CursorFactory.ForTool(tool.Id);
+            Check($"生成「{tool.Name}」光标", cursor is not null);
+        }
+
+        Check("同一工具的光标是缓存复用", ReferenceEquals(
+            CursorFactory.ForTool(ToolCatalog.SprayId), CursorFactory.ForTool(ToolCatalog.SprayId)));
     }
 }

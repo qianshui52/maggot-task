@@ -71,6 +71,9 @@ public sealed class PersistenceService : IDisposable
             state.DailyTemplates ??= new List<DailyTemplate>();
             // v1 / v2 的 state.json 里没有 weeklyTemplates 键 —— 同样补成空表（不抛异常）。
             state.WeeklyTemplates ??= new List<WeeklyTemplate>();
+            // v1–v3 的 state.json 里没有 progress 键 —— 补一个全新进度。
+            state.Progress ??= new GameProgress();
+            state.Progress.Normalize();
             if (state.Version < AppState.CurrentVersion) state.Version = AppState.CurrentVersion;
             LastError = null;
             return state;

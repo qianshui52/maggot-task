@@ -13,7 +13,6 @@
         WindowStartupLocation="Manual"
         SnapsToDevicePixels="False"
         UseLayoutRounding="False"
-        IsHitTestVisible="False"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType">
 

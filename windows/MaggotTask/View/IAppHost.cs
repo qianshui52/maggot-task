@@ -32,6 +32,24 @@ public interface IAppHost
     /// <summary>累计拍死数量。</summary>
     long SquashedCount { get; }
 
+    /// <summary>
+    /// 元游戏进度（货币 / 击杀 / 连胜 / 工具 / 勋章）。视图只读它；
+    /// 花钱与换装备必须走 <see cref="BuyTool"/> / <see cref="EquipTool"/>。
+    /// </summary>
+    GameProgress Progress { get; }
+
+    /// <summary>购买工具（成功后自动装备、落盘、刷新界面）。</summary>
+    void BuyTool(string toolId);
+
+    /// <summary>装备一件已拥有的工具。</summary>
+    void EquipTool(string toolId);
+
+    /// <summary>打开军械库。</summary>
+    void OpenShop();
+
+    /// <summary>打开荣誉殿堂（连胜日历 + 勋章墙）。</summary>
+    void OpenHonor();
+
     /// <summary>距离变苍蝇的剩余时间文案。</summary>
     string RemainingText(float rot);
 

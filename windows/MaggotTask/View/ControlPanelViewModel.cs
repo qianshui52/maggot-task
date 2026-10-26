@@ -62,6 +62,12 @@ public sealed class ControlPanelViewModel : ViewModelBase
     public string SquashedText => $"{_squashed} 个";
     public string LastSeenText { get => _lastSeenText; set => SetField(ref _lastSeenText, value); }
 
+    /// <summary>钱包余额（击杀奖励的唯一出口）。</summary>
+    public string CoinsText => _host.Progress.Coins.ToString("N0");
+
+    /// <summary>当前装备的工具名。</summary>
+    public string EquippedToolText => _host.Progress.EquippedToolDef.Name;
+
     /// <summary>
     /// 腐烂压力条下方那一行。用**一个绑定的字符串**而不是多个 <c>Run</c>：
     /// TextBlock 带内联时不支持 TextTrimming，面板宽度固定 348，
@@ -265,6 +271,9 @@ public sealed class ControlPanelViewModel : ViewModelBase
         _squashed = (int)_host.SquashedCount;
         Raise(nameof(SquashedText));
         Raise(nameof(StatusRowText));
+        Raise(nameof(CoinsText));
+        Raise(nameof(EquippedToolText));
+        Raise(nameof(FooterText));
 
         Running = _host.Config.Running;
         _rotSpeed = _host.Config.RotSpeed;

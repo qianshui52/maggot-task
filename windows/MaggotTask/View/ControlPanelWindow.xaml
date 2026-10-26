@@ -196,6 +196,51 @@
                                ToolTip="{Binding StatusRowText}" />
                 </StackPanel>
 
+                <!-- ============ 3b. 钱包 / 军械库 / 荣誉墙 ============ -->
+                <Border Style="{StaticResource PanelCard}"
+                        Background="{StaticResource SurfaceBrush}"
+                        Margin="16,12,16,0"
+                        Padding="12,9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="货币" Style="{StaticResource TextLabel}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock Text="{Binding CoinsText}"
+                                           FontFamily="{StaticResource MonoFont}"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="#FFF5C542" />
+                                <TextBlock Text="{Binding EquippedToolText}"
+                                           Style="{StaticResource TextData}"
+                                           Foreground="{StaticResource FgMutedBrush}"
+                                           VerticalAlignment="Bottom"
+                                           Margin="8,0,0,2" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="军械库"
+                                    Style="{StaticResource GhostButton}"
+                                    MinWidth="58" MinHeight="32" Height="32"
+                                    Padding="8,0" FontSize="12"
+                                    Click="OnOpenShopClick"
+                                    ToolTip="用击杀赚来的货币购买进阶杀虫工具" />
+                            <Button Content="荣誉墙"
+                                    Style="{StaticResource GhostButton}"
+                                    MinWidth="58" MinHeight="32" Height="32"
+                                    Padding="8,0" FontSize="12"
+                                    Margin="8,0,0,0"
+                                    Click="OnOpenHonorClick"
+                                    ToolTip="连胜日历与勋章墙" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- ============ 4. 主行动：启动 / 暂停 ============ -->
                 <Button Content="{Binding RunButtonText}"
                         Command="{Binding RunCommand}"

@@ -18,12 +18,9 @@ public sealed class SwarmModel
 
     private readonly Dictionary<string, CreatureVisual> _creatures = new(StringComparer.Ordinal);
     private readonly Random _rng = new();
-    private readonly SplatField _splats = new();
 
     /// <summary>当前虚拟桌面边界（逻辑像素）。</summary>
     public Rect Bounds { get; set; } = new(0, 0, 1920, 1080);
-
-    public SplatField Splats => _splats;
 
     public int Count => _creatures.Count;
 
@@ -68,13 +65,14 @@ public sealed class SwarmModel
         }
     }
 
-    /// <summary>拍死时立刻移除生物（原地爆浆由 <see cref="SplatField"/> 负责）。</summary>
-    public bool RemoveAt(string taskId, Stage stage, double now)
+    /// <summary>
+    /// 击杀时立刻移除生物。
+    /// 消除特效由 <see cref="MaggotTask.Render.KillBurstField"/> 在覆盖层里负责 ——
+    /// 模型本身不持有任何特效状态，避免"模型层偷偷画东西"。
+    /// </summary>
+    public bool RemoveAt(string taskId)
     {
-        if (!_creatures.TryGetValue(taskId, out CreatureVisual? c)) return false;
-        _splats.Spawn(c.Position, stage, now);
-        _creatures.Remove(taskId);
-        return true;
+        return _creatures.Remove(taskId);
     }
 
     /// <summary>按 id 取生物（点杀判定用）。</summary>
@@ -84,7 +82,6 @@ public sealed class SwarmModel
     public void Clear()
     {
         _creatures.Clear();
-        _splats.Clear();
     }
 
     /// <summary>新生物从随机的屏幕边缘外飞入。</summary>
@@ -117,8 +114,6 @@ public sealed class SwarmModel
     /// </summary>
     public void Update(double now, double dt, bool reduceMotion)
     {
-        _splats.Update(now, dt);
-
         Rect b = Bounds;
         foreach (CreatureVisual c in _creatures.Values)
         {
@@ -289,4 +284,76 @@ public sealed class SwarmModel
 
         return best;
     }
+
+    /// <summary>
+    /// 按工具形状收集本次出手命中的全部生物。
+    ///
+    /// 形状规则（与 <see cref="ToolCatalog"/> 一一对应）：
+    ///   Single —— 只取最近的一只，半径 size × 0.85 × 1.35（比悬停的 0.7 宽，手感更好）
+    ///   Circle —— 圆心 <paramref name="p"/>、半径 tool.Radius
+    ///   Cross  —— 横竖两条「长 2×Radius、半宽 Width」的带，取并集
+    ///   Beam   —— 以 p.Y 为中心、半宽 Width 的全屏横向带
+    /// </summary>
+    public List<CreatureVisual> CollectHits(ToolDef tool, Point p)
+    {
+        var hits = new List<CreatureVisual>();
+
+        switch (tool.Shape)
+        {
+            case ToolShape.Single:
+            {
+                CreatureVisual? best = HitTest(p);
+                if (best is not null) hits.Add(best);
+                break;
+            }
+
+            case ToolShape.Circle:
+            {
+                double r2 = tool.Radius * tool.Radius;
+                foreach (CreatureVisual c in _creatures.Values)
+                {
+                    if (DistanceSquared(c.Position, p) <= r2 + HalfExtentSquared(c)) hits.Add(c);
+                }
+                break;
+            }
+
+            case ToolShape.Cross:
+            {
+                double reach = tool.Radius;
+                double half = tool.Width;
+                foreach (CreatureVisual c in _creatures.Values)
+                {
+                    double dx = Math.Abs(c.Position.X - p.X);
+                    double dy = Math.Abs(c.Position.Y - p.Y);
+                    double pad = c.Size * 0.45;   // 生物自身半径，避免"擦边不算"
+
+                    bool horizontal = dx <= reach + pad && dy <= half + pad;
+                    bool vertical = dy <= reach + pad && dx <= half + pad;
+                    if (horizontal || vertical) hits.Add(c);
+                }
+                break;
+            }
+
+            case ToolShape.Beam:
+            {
+                double half = tool.Width;
+                foreach (CreatureVisual c in _creatures.Values)
+                {
+                    if (Math.Abs(c.Position.Y - p.Y) <= half + c.Size * 0.45) hits.Add(c);
+                }
+                break;
+            }
+        }
+
+        return hits;
+    }
+
+    private static double DistanceSquared(Point a, Point b)
+    {
+        double dx = a.X - b.X;
+        double dy = a.Y - b.Y;
+        return dx * dx + dy * dy;
+    }
+
+    private static double HalfExtentSquared(CreatureVisual c) => c.Size * c.Size * 0.2;
 }

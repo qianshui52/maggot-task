@@ -7,9 +7,25 @@
 > 放在你屏幕上，当着你的面腐烂。
 
 [![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Windows-brightgreen)](#-下载)
-[![Tests](https://img.shields.io/badge/tests-53%20%2B%20527%20%E2%9C%93-success)](#-测试)
+[![Tests](https://img.shields.io/badge/tests-53%20%2B%20594%20%E2%9C%93-success)](#-测试)
 [![Network](https://img.shields.io/badge/network-none-black)](#-隐私)
 [![License](https://img.shields.io/badge/license-MIT-blue)](#-许可证)
+
+---
+
+## ⚡ 只想直接体验？不用编译
+
+**[📦 点这里打开安装包文件夹](以上为源代码，想直接体验请查看这个文件夹/)** —— 里面只有能直接装、直接跑的文件。
+
+| 平台 | 文件 | 前置条件 |
+|:--|:--|:--|
+| Windows 10/11 x64 | [`MaggotTask-Windows-1.3.0.zip`](以上为源代码，想直接体验请查看这个文件夹/MaggotTask-Windows-1.3.0.zip)（0.8 MB） | 需装 [.NET 7 桌面运行时](https://dotnet.microsoft.com/zh-cn/download/dotnet/7.0) |
+| Android 8.0+ | [`MaggotTask-Android-1.2.10.apk`](以上为源代码，想直接体验请查看这个文件夹/MaggotTask-Android-1.2.10.apk)（7.0 MB） | 允许「未知来源」+ 悬浮窗权限 |
+
+> 详细系统要求、逐步安装说明、以及**两个版本的功能差异**（元游戏目前仅 Windows 有）
+> 都写在那份 [文件夹里的 README](以上为源代码，想直接体验请查看这个文件夹/README.md) 中。
+>
+> 源代码仍在 `android/` 与 `windows/`，本文件夹只是分发出口，不影响构建。
 
 ---
 
@@ -44,16 +60,26 @@
 | 🧬 **失控繁殖** | 烂透的任务孵化苍蝇；两只苍蝇随机交配产下新一代——拖延会指数增长 |
 | 📅 **每日 / 每周任务** | 「锻炼」「写周报」到点自动产卵；漏掉的那周不会消失，它会**连本带利地烂** |
 | 🖱️ **悬停审讯** | 鼠标/长按停在虫子上，弹出气泡：这是哪个任务、烂到多少、你冷落了它多久 |
+| 🎯 **亲手击毙** | 关掉穿透，光标换成苍蝇拍；0.18 秒浮出名牌，点一下就是一声脆响 + 一次洁净消除（没有血、没有汁） |
+| 💰 **击杀经济** | 卵 100 / 蛆 50 / 蛹 25 / 苍蝇 10 —— 越早清越值钱。金币只来自亲手击杀 |
+| 🔫 **军械库** | 杀虫喷雾 1,000 / 唐太刀 10,000 / 霓虹激光枪 50,000，一键清一片，冷却换强度 |
+| 🏅 **十枚勋章** | 从「第一拍」到「千虫之主」，全部由真实击杀与连胜派生，绝不虚标 |
+| 🔥 **连胜日历** | 多邻国式连胜 + 5 周热力日历：今天清一只就算打卡，断了会心疼 |
 | 🔊 **一套音效** | 产卵、孵化、化蝇、交配、拍死——每种人生阶段都有声音反馈（可关） |
 | 🩺 **体检卡** | 「虫群在不在、视口多大、时钟走没走」一张卡说清——从不让你对着黑屏猜 |
 | 💥 **崩溃自白书** | 万一闪退，下次启动直接把完整堆栈拍你脸上，长按复制即可报修 |
 | ♿ **减少动效适配** | 系统开「减少动态效果」→ 虫子静止但绝不消失（这曾是个 bug，现在写进了测试） |
 
+![军械库 · 荣誉殿堂 · 连胜日历](docs/images/meta-game-shop-honor.png)
+
+<sub>左：军械库 —— 三件进阶工具，价格与命中范围明码标价。右：荣誉殿堂 —— 当前连胜、5 周热力日历、十枚勋章。</sub>
+
 ## 📱 下载
 
 ### Android（8.0+）
 
-从 [Releases](../../releases) 下载 `MaggotTask-Android-x.x.x.apk` 直接安装：
+从 [**安装包文件夹**](以上为源代码，想直接体验请查看这个文件夹/) 下载
+`MaggotTask-Android-1.2.10.apk` 直接安装：
 
 1. 允许安装未知来源应用；
 2. 首次打开按引导授予**悬浮窗权限**（SYSTEM_ALERT_WINDOW）；
@@ -64,7 +90,16 @@
 
 ### Windows（10/11）
 
-从源码构建（见下文），运行 `MaggotTask.exe`，托盘图标控制一切。
+从 [**安装包文件夹**](以上为源代码，想直接体验请查看这个文件夹/) 下载
+`MaggotTask-Windows-1.3.0.zip`，**完整解压**后双击 `MaggotTask.exe`：
+
+1. 先装 [.NET 7 桌面运行时](https://dotnet.microsoft.com/zh-cn/download/dotnet/7.0)
+   （或 `winget install Microsoft.DotNet.DesktopRuntime.7`）；
+2. 解压 zip 到任意文件夹（不要在压缩包里直接双击）；
+3. 托盘出现虫子图标即启动成功。
+
+> 没有代码签名，首次运行 SmartScreen 会拦一下：「更多信息」→「仍要运行」。
+> 也可以按下面的方式从源码构建。
 
 ## 🛠️ 从源码构建
 
@@ -81,8 +116,11 @@ cd android
 ```bash
 cd windows
 dotnet build MaggotTask.sln -c Release
-./MaggotTask/bin/Release/net7.0-windows/MaggotTask.exe --selftest   # 527 项断言
+./MaggotTask/bin/Release/net7.0-windows/MaggotTask.exe --selftest   # 594 项断言
 ```
+
+元游戏的数值契约（奖励 / 价格 / 连胜 / 勋章条件）见
+[`docs/meta-game.md`](docs/meta-game.md) —— 改数值先改那份文档。
 
 ## 🧠 为什么两端长得一模一样
 
@@ -100,7 +138,7 @@ Kotlin      C# / WPF
 Compose     悬浮穿透窗
 ```
 
-数据结构（`state.json` v3）两端共享，换设备不换虫。
+数据结构（`state.json` v4）两端共享，换设备不换虫。
 
 ## 🔒 隐私
 

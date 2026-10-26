@@ -121,6 +121,20 @@ public partial class ControlPanelWindow : Window
         e.Handled = true;
     }
 
+    /// <summary>「军械库」：买/换杀虫工具。</summary>
+    private void OnOpenShopClick(object sender, RoutedEventArgs e)
+    {
+        _host.OpenShop();
+        e.Handled = true;
+    }
+
+    /// <summary>「荣誉墙」：连胜日历 + 勋章。</summary>
+    private void OnOpenHonorClick(object sender, RoutedEventArgs e)
+    {
+        _host.OpenHonor();
+        e.Handled = true;
+    }
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);

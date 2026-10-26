@@ -18,6 +18,7 @@ namespace MaggotTask.View;
 public partial class OverlayWindow : Window
 {
     private readonly SwarmModel _model = new();
+    private readonly KillBurstField _bursts = new();
     private readonly SwarmRenderer _renderer;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
 
@@ -25,11 +26,23 @@ public partial class OverlayWindow : Window
     private bool _reduceMotion;
     private bool _clickThrough = true;
 
+    private ToolDef _tool = ToolCatalog.Swatter;
+    private double _lastAttackAt = double.NegativeInfinity;
+
+    /// <summary>本次出手累计命中数（诊断用）。</summary>
+    public int TotalHits { get; private set; }
+
+    /// <summary>因冷却被忽略的点击次数（诊断用）。</summary>
+    public int CooldownSkips { get; private set; }
+
+    /// <summary>空挥次数（点下去但附近没有目标，诊断用）。</summary>
+    public int MissClicks { get; private set; }
+
     public OverlayWindow()
     {
         InitializeComponent();
 
-        _renderer = new SwarmRenderer(_model);
+        _renderer = new SwarmRenderer(_model, _bursts);
         RootCanvas.Children.Add(_renderer);
 
         Loaded += OnLoaded;
@@ -43,8 +56,14 @@ public partial class OverlayWindow : Window
     /// <summary>虫群模型（App 负责同步任务与推进）。</summary>
     public SwarmModel Model => _model;
 
-    /// <summary>点击（非穿透状态下）拍到某只虫子时触发。</summary>
-    public event Action<string, Stage>? CreatureSquashed;
+    /// <summary>消除特效场（诊断用）。</summary>
+    public KillBurstField Bursts => _bursts;
+
+    /// <summary>
+    /// 一次出手打中的全部生物（可能 0 个，也可能一次一片）。
+    /// App 负责记账 + 把对应任务标记完成。
+    /// </summary>
+    public event Action<IReadOnlyList<KillHit>>? CreaturesSquashed;
 
     /// <summary>
     /// 每个渲染帧触发一次：(秒级时间, dt)。App 用它驱动唯一的模拟循环，
@@ -196,6 +215,35 @@ public partial class OverlayWindow : Window
         {
             Debug.WriteLine($"[MaggotTask] 切换穿透失败: {ex.Message}");
         }
+        UpdateCursor();
+    }
+
+    /// <summary>
+    /// 换装备。光标与范围立即生效；冷却按新工具重新计算（不会卡着旧冷却）。
+    /// </summary>
+    public void ApplyTool(ToolDef tool)
+    {
+        _tool = tool ?? ToolCatalog.Swatter;
+        _lastAttackAt = double.NegativeInfinity;
+        UpdateCursor();
+    }
+
+    /// <summary>当前装备（诊断用）。</summary>
+    public ToolDef CurrentTool => _tool;
+
+    /// <summary>
+    /// 只有"能吃点击"时才换工具光标 —— 穿透状态下窗口根本不接收命中测试，
+    /// 光标应当保持系统箭头，否则用户会以为桌面上的东西都能点。
+    /// </summary>
+    private void UpdateCursor()
+    {
+        if (_clickThrough)
+        {
+            Cursor = Cursors.Arrow;
+            return;
+        }
+
+        Cursor = CursorFactory.ForTool(_tool.Id) ?? Cursors.Arrow;
     }
 
     /// <summary>诊断：当前是否真的处于穿透状态（读 Win32 样式位）。</summary>
@@ -235,6 +283,7 @@ public partial class OverlayWindow : Window
         // 虫群位置按真实帧间隔推进，最后绘制。
         Frame?.Invoke(now, dt);
         _model.Update(now, dt, _reduceMotion);
+        _bursts.Update(now, dt);
         _renderer.Redraw(now);
 
         LastFrameMs = (Stopwatch.GetTimestamp() - wallStart) * 1000.0 / Stopwatch.Frequency;
@@ -256,7 +305,7 @@ public partial class OverlayWindow : Window
     }
 
     // ------------------------------------------------------------------
-    // 关闭穿透后：点一下就拍
+    // 关闭穿透后：点一下出手
     // ------------------------------------------------------------------
 
     protected override void OnMouseLeftButtonDown(System.Windows.Input.MouseButtonEventArgs e)
@@ -264,14 +313,59 @@ public partial class OverlayWindow : Window
         base.OnMouseLeftButtonDown(e);
         if (_clickThrough) return;
 
-        Point p = e.GetPosition(this);
-        CreatureVisual? hit = _model.HitTest(p);
-        if (hit is null) return;
+        double now = _clock.Elapsed.TotalSeconds;
 
-        Stage stage = hit.Stage;
-        string id = hit.TaskId;
-        CreatureSquashed?.Invoke(id, stage);
+        // 冷却：同一个工具两次出手之间必须间隔够 —— 否则范围武器可以连续点击刷屏。
+        if (_tool.CooldownSeconds > 0 && now - _lastAttackAt < _tool.CooldownSeconds)
+        {
+            CooldownSkips++;
+            e.Handled = true;
+            return;
+        }
+        _lastAttackAt = now;
+
+        Point p = e.GetPosition(this);
+        List<CreatureVisual> hits = _model.CollectHits(_tool, p);
+
+        if (hits.Count == 0)
+        {
+            MissClicks++;
+            e.Handled = true;
+            return;
+        }
+
+        var payload = new List<KillHit>(hits.Count);
+        foreach (CreatureVisual c in hits)
+        {
+            payload.Add(new KillHit(c.TaskId, c.Stage, c.Position));
+        }
+
+        // 先从模型移除，视觉上"立刻消失"，再由特效接管
+        foreach (CreatureVisual c in hits)
+        {
+            _model.RemoveAt(c.TaskId);
+        }
+
+        // 单点用小光环，范围武器按实际覆盖半径放大
+        double ringRadius = _tool.Shape switch
+        {
+            ToolShape.Circle => _tool.Radius,
+            ToolShape.Cross => _tool.Width * 2.2,
+            ToolShape.Beam => 64.0,
+            _ => 34.0,
+        };
+
+        foreach (KillHit hit in payload)
+        {
+            Stage stage = hit.Stage;
+            int reward = ToolCatalog.RewardFor(stage);
+            _bursts.Spawn(hit.At, stage, reward, now, ringRadius);
+        }
+
+        TotalHits += payload.Count;
         e.Handled = true;
+
+        CreaturesSquashed?.Invoke(payload);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -282,7 +376,7 @@ public partial class OverlayWindow : Window
     }
 
     // ==================================================================
-    // 渲染器：三个 DrawingVisual 图层（阴影 / 本体 / 爆浆）
+    // 渲染器：四个 DrawingVisual 图层（阴影 / 本体 / 消除特效 / 光环）
     //
     // 阴影必须单独成层，否则模糊会把本体也糊掉。
     // 模糊效果实例是全类共享且 Freeze 的，避免每帧 new 出一个新的 Effect
@@ -291,19 +385,21 @@ public partial class OverlayWindow : Window
     private sealed class SwarmRenderer : FrameworkElement
     {
         private readonly SwarmModel _model;
+        private readonly KillBurstField _bursts;
         private readonly VisualCollection _layers;
         private readonly DrawingVisual _shadowLayer = new();
         private readonly DrawingVisual _bodyLayer = new();
-        private readonly DrawingVisual _splatLayer = new();
+        private readonly DrawingVisual _burstLayer = new();
 
-        public SwarmRenderer(SwarmModel model)
+        public SwarmRenderer(SwarmModel model, KillBurstField bursts)
         {
             _model = model;
+            _bursts = bursts;
             _layers = new VisualCollection(this)
             {
                 _shadowLayer,
                 _bodyLayer,
-                _splatLayer,
+                _burstLayer,
             };
 
             // 软件渲染下 WPF 的图像缩放默认走 Fant（高质量重采样），把一张小图缩到
@@ -343,10 +439,14 @@ public partial class OverlayWindow : Window
                 }
             }
 
-            using (DrawingContext dc = _splatLayer.RenderOpen())
+            using (DrawingContext dc = _burstLayer.RenderOpen())
             {
-                _model.Splats.Draw(dc, now, ReduceMotion);
+                double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+                _bursts.Draw(dc, now, ReduceMotion, dpi);
             }
         }
     }
 }
+
+/// <summary>一次出手命中的一只生物（位置是命中瞬间的位置）。</summary>
+public readonly record struct KillHit(string TaskId, Stage Stage, Point At);

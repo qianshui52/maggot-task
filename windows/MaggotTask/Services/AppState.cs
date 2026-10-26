@@ -11,12 +11,13 @@ public sealed class AppState
     ///   v1 —— 没有每日任务字段（DailyTemplates 缺失、TaskItem 没有 daily* 字段）。
     ///   v2 —— 加入每日任务模板（规格 §12）。
     ///   v3 —— 加入每周任务模板（规格 §15）。
-    /// 读取时**不做版本判断**：缺失字段一律取默认值，所以 v1 / v2 文件能直接读进来，不抛异常。
+    ///   v4 —— 加入元游戏进度：货币 / 击杀统计 / 连胜日历 / 工具 / 勋章。
+    /// 读取时**不做版本判断**：缺失字段一律取默认值，所以 v1 / v2 / v3 文件能直接读进来，不抛异常。
     /// </summary>
     public int Version { get; set; } = CurrentVersion;
 
     /// <summary>当前写盘使用的格式版本。</summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public List<TaskItem> Tasks { get; set; } = new();
 
@@ -33,6 +34,12 @@ public sealed class AppState
 
     /// <summary>累计拍死数量。</summary>
     public long SquashedCount { get; set; }
+
+    /// <summary>
+    /// 元游戏进度（货币 / 击杀 / 连胜 / 工具 / 勋章）。v4 之前没有这个键 → 反序列化为 null，
+    /// 由 <see cref="PersistenceService.Load"/> 补成全新对象。
+    /// </summary>
+    public GameProgress Progress { get; set; } = new();
 
     // 控制面板窗口位置（顺手持久化，规格未要求，纯体验）。
     public double? PanelLeft { get; set; }
@@ -51,6 +58,10 @@ public sealed class AppState
 [JsonSerializable(typeof(DailyTemplate))]
 [JsonSerializable(typeof(WeeklyTemplate))]
 [JsonSerializable(typeof(MaggotConfig))]
+[JsonSerializable(typeof(GameProgress))]
+[JsonSerializable(typeof(DayLog))]
+[JsonSerializable(typeof(Dictionary<string, DayLog>))]
+[JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(List<TaskItem>))]
 [JsonSerializable(typeof(List<DailyTemplate>))]
 [JsonSerializable(typeof(List<WeeklyTemplate>))]

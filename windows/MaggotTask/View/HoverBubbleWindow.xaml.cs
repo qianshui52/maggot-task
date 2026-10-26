@@ -51,6 +51,15 @@ public partial class HoverBubbleWindow : Window
     /// <summary>悬停追踪器（--diag-hover 直接驱动它）。</summary>
     public HoverTracker Tracker => _tracker;
 
+    /// <summary>
+    /// 覆盖层左上角在屏幕上的 DIP 坐标。气泡收到的是**覆盖层本地坐标**，
+    /// 要摆到屏幕上必须先加回这个原点。
+    ///
+    /// 旧实现用 <c>PointToScreen</c> 把"覆盖层本地坐标"当成"气泡本地坐标"来换算，
+    /// 气泡一移动就会把自己当前的位置再叠一次 —— 于是在 125% 缩放下越飘越远。
+    /// </summary>
+    public Point OverlayOrigin { get; set; }
+
     /// <summary>气泡当前展示的任务 id（null = 没显示）。</summary>
     public string? VisibleTaskId => _visibleTaskId;
 
@@ -152,7 +161,9 @@ public partial class HoverBubbleWindow : Window
     {
         try
         {
-            Point screen = PointToScreen(overlayLocalCursor);
+            var screen = new Point(
+                OverlayOrigin.X + overlayLocalCursor.X,
+                OverlayOrigin.Y + overlayLocalCursor.Y);
             Rect work = SystemParameters.WorkArea;
 
             double gap = CursorGap;

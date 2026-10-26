@@ -45,6 +45,18 @@ public partial class App : System.Windows.Application, IAppHost
     private ControlPanelWindow? _panel;
     private TaskListWindow? _taskList;
     private HoverBubbleWindow? _hoverBubble;
+    private NameTagWindow? _nameTag;
+    private ShopWindow? _shop;
+    private HonorWindow? _honor;
+
+    /// <summary>悬停名牌的驻留追踪（0.18 秒就浮出来，和 §14 的 3 秒气泡是两条阈值）。</summary>
+    private readonly HoverTracker _nameTagTracker = new(0.18);
+
+    /// <summary>标记上一次检查「今天」时的日期键，用于跨天刷新连胜。</summary>
+    private string _lastStreakDay = string.Empty;
+
+    /// <summary>上一次提示过的勋章（避免重复弹窗）。</summary>
+    private readonly HashSet<string> _announcedMedals = new(StringComparer.Ordinal);
 
     private readonly List<Action> _viewRefreshHandlers = new();
     private readonly DispatcherTimer _idleTimer;
@@ -126,6 +138,9 @@ public partial class App : System.Windows.Application, IAppHost
     public double AverageRot => Engine.AverageRot;
 
     public long SquashedCount => Engine.SquashedCount;
+
+    /// <summary>元游戏进度（货币 / 击杀 / 连胜 / 工具 / 勋章）。</summary>
+    public GameProgress Progress => _state.Progress;
 
     public string RemainingText(float rot) => Engine.RemainingText(rot);
 
@@ -350,6 +365,8 @@ public partial class App : System.Windows.Application, IAppHost
         bool diagSound = e.Args.Any(a => a.Equals("--diag-sound", StringComparison.OrdinalIgnoreCase));
         bool diagWeekly = e.Args.Any(a => a.Equals("--diag-weekly", StringComparison.OrdinalIgnoreCase));
         bool diagFps = e.Args.Any(a => a.Equals("--diag-fps", StringComparison.OrdinalIgnoreCase));
+        bool diagGame = e.Args.Any(a => a.Equals("--diag-game", StringComparison.OrdinalIgnoreCase));
+        bool diagKill = e.Args.Any(a => a.Equals("--diag-kill", StringComparison.OrdinalIgnoreCase));
         bool seedDemo = e.Args.Any(a => a.Equals("--seed-demo", StringComparison.OrdinalIgnoreCase));
         string? stageArg = e.Args.FirstOrDefault(a => a.StartsWith("--stage=", StringComparison.OrdinalIgnoreCase));
 
@@ -405,7 +422,7 @@ public partial class App : System.Windows.Application, IAppHost
         try
         {
             Bootstrap(smoke);
-            if (seedDemo || diagHover) SeedDemoTasks();
+            if (seedDemo || diagHover || diagGame || diagKill) SeedDemoTasks();
             if (diagSound) { RunSoundDiagnostics(); ExitApp(); return; }
             if (diagFps)
             {
@@ -432,6 +449,18 @@ public partial class App : System.Windows.Application, IAppHost
                 Dispatcher.BeginInvoke(new Action(RunWeeklyDiagnostics), DispatcherPriority.ApplicationIdle);
                 return;
             }
+            if (diagGame)
+            {
+                // 打开军械库 + 荣誉殿堂，停留 30 秒供人工/截图核对，然后正常退出。
+                Dispatcher.BeginInvoke(new Action(RunGameDiagnostics), DispatcherPriority.ApplicationIdle);
+                return;
+            }
+            if (diagKill)
+            {
+                // 端到端验证「悬停 → 点击 → 记账」：把一只卵钉在固定坐标，等外部脚本去点。
+                Dispatcher.BeginInvoke(new Action(RunKillDiagnostics), DispatcherPriority.ApplicationIdle);
+                return;
+            }
             if (diagUi) StartUiDiagnostics();
         }
         catch (Exception ex)
@@ -451,6 +480,17 @@ public partial class App : System.Windows.Application, IAppHost
         _persistence = new PersistenceService(TimeSpan.FromSeconds(5));
         _state = _persistence.Load();
         _state.Config.Normalize();
+        _state.Progress ??= new GameProgress();
+        _state.Progress.Normalize();
+
+        // 跨天校正：昨天没打、前天也没打 → 连胜已经断了（BestStreak 保留）。
+        _lastStreakDay = DailyKeys.Today();
+        _state.Progress.RefreshStreak(_lastStreakDay);
+
+        // 补登记：旧存档 / 手改存档里可能已经有达成条件但没登记的勋章。
+        // 启动时静默补上，并且不弹通知 —— 用户不想一开程序就被"你早就拿到了"刷屏。
+        _state.Progress.EvaluateMedals(_lastStreakDay);
+        foreach (string id in _state.Progress.UnlockedMedals.Keys) _announcedMedals.Add(id);
 
         // 2) 引擎
         Engine = new LifecycleEngine(_state.Config);
@@ -478,7 +518,8 @@ public partial class App : System.Windows.Application, IAppHost
         // 6) 窗口
         _overlay = new OverlayWindow { ReduceMotion = ReduceMotion };
         ApplyAppIcon(_overlay);
-        _overlay.CreatureSquashed += OnCreatureSquashed;
+        _overlay.CreaturesSquashed += OnCreaturesSquashed;
+        _overlay.ApplyTool(_state.Progress.EquippedToolDef);
         _overlay.Show();
         _overlay.ApplyClickThrough(_state.Config.ClickThrough);
 
@@ -500,8 +541,15 @@ public partial class App : System.Windows.Application, IAppHost
             CurrentCursorLocal,
             () => _clock.Elapsed.TotalSeconds);
         ApplyAppIcon(_hoverBubble);
+        _hoverBubble.OverlayOrigin = new Point(_overlay.Left, _overlay.Top);
         _hoverBubble.Show();
         _hoverBubble.Hide();
+
+        // 6d) 悬停名牌（击杀模式的即时反馈）：比详情气泡快得多。
+        _nameTag = new NameTagWindow();
+        ApplyAppIcon(_nameTag);
+        _nameTag.Show();
+        _nameTag.Hide();
 
         // 先同步一次集合与界面（不推进引擎，节拍器从零开始计时）。
         SyncOnly();
@@ -585,15 +633,34 @@ public partial class App : System.Windows.Application, IAppHost
     // 也不订阅鼠标事件，只在主循环里按 ~10Hz 轮询 GetCursorPos（Cursor.Position）。
     // ------------------------------------------------------------------
 
-    /// <summary>全局光标位置换算到覆盖层本地坐标（覆盖层左上角 = 虚拟桌面左上角）。</summary>
+    /// <summary>
+    /// 全局光标位置换算到覆盖层本地坐标（覆盖层左上角 = 虚拟桌面左上角）。
+    ///
+    /// ⚠️ 必须做一次「设备像素 → DIP」的换算：
+    /// <c>Cursor.Position</c> 给的是**物理像素**，而 <see cref="CreatureVisual.Position"/>
+    /// 是覆盖层里的 **DIP**。在 125% 缩放下两者差 1.25 倍 ——
+    /// 不换算的话悬停判定会永远落在生物右边/下边约 100px 处，名牌与气泡都不出来。
+    /// （点击没这个问题：<c>MouseEventArgs.GetPosition</c> 直接给 DIP。）
+    /// </summary>
     private Point CurrentCursorLocal()
     {
         try
         {
             System.Drawing.Point p = System.Windows.Forms.Cursor.Position;
-            double left = _overlay?.Left ?? 0.0;
-            double top = _overlay?.Top ?? 0.0;
-            return new Point(p.X - left, p.Y - top);
+            var device = new Point(p.X, p.Y);
+
+            if (_overlay is not null)
+            {
+                PresentationSource? source = PresentationSource.FromVisual(_overlay);
+                if (source?.CompositionTarget is not null)
+                {
+                    device = source.CompositionTarget.TransformFromDevice.Transform(device);
+                }
+
+                return new Point(device.X - _overlay.Left, device.Y - _overlay.Top);
+            }
+
+            return device;
         }
         catch (Exception ex)
         {
@@ -617,26 +684,73 @@ public partial class App : System.Windows.Application, IAppHost
         return _hoverTargets;
     }
 
-    /// <summary>每帧调用；气泡内部自己限流到约 10Hz（规格 §14.1）。</summary>
+    /// <summary>名牌自己的轮询节拍（秒），与气泡互不影响。</summary>
+    private double _lastNameTagPoll;
+
+    /// <summary>
+    /// 每帧调用。两条独立的悬停链路：
+    ///   · 名牌 —— 0.18 秒就浮出来，一行「名字 · 阶段 · +奖励」
+    ///   · 气泡 —— 规格 §14 的 3 秒详情卡（腐烂度 / 每日 / 每周）
+    /// 两者同时出现会互相压住，所以详情气泡登场时主动收起名牌。
+    /// </summary>
     private void HoverTick()
     {
         if (_hoverBubble is null) return;
 
-        // 虫群层不可见 / 没有生物 → 直接收起，避免残留气泡（验收标准 4）。
+        // 虫群层不可见 / 没有生物 → 两条链路都收起，避免残留（验收标准 4）。
         if (_overlay is not { IsVisible: true } || _overlay.Model.Count == 0)
         {
             _hoverBubble.Tracker.Reset();
+            _nameTagTracker.Reset();
             if (_hoverBubble.IsVisible) _hoverBubble.Hide();
+            _nameTag?.HideTag();
             return;
         }
 
         _hoverBubble.Tick();
 
-        if (!_hoverBubble.Tracker.IsShown)
+        bool bubbleShown = _hoverBubble.Tracker.IsShown;
+        if (!bubbleShown && _hoverBubble.IsVisible) _hoverBubble.Hide();
+
+        // ---- 名牌 ----
+        double now = _clock.Elapsed.TotalSeconds;
+        if (now - _lastNameTagPoll >= HoverTracker.PollIntervalSeconds)
         {
-            if (_hoverBubble.IsVisible) _hoverBubble.Hide();
-            return;
+            double dt = _lastNameTagPoll <= 0 ? HoverTracker.PollIntervalSeconds : now - _lastNameTagPoll;
+            _lastNameTagPoll = now;
+
+            Point cursor = CurrentCursorLocal();
+            HoverPollResult r = _nameTagTracker.Poll(CollectHoverTargets(), cursor, dt);
+
+            if (!r.ShouldShow || bubbleShown || r.HoveredId is null)
+            {
+                _nameTag?.HideTag();
+            }
+            else
+            {
+                TaskItem? tagTask = Engine.FindById(r.HoveredId);
+                if (tagTask is null)
+                {
+                    _nameTagTracker.Reset();
+                    _nameTag?.HideTag();
+                }
+                else
+                {
+                    Stage stage = LifecycleEngine.StageOf(tagTask);
+                    _nameTag?.UpdateContent(tagTask, stage, ToolCatalog.RewardFor(stage));
+                    if (_nameTag is not null)
+                    {
+                        // 覆盖层左上角 = 虚拟桌面左上角，所以本地坐标加窗口偏移就是屏幕 DIP 坐标
+                        var screen = new Point(
+                            (_overlay?.Left ?? 0) + cursor.X,
+                            (_overlay?.Top ?? 0) + cursor.Y);
+                        _nameTag.ShowAt(screen);
+                    }
+                }
+            }
         }
+
+        if (!bubbleShown) return;
 
         string? id = _hoverBubble.Tracker.HoveredId;
         if (id is null) return;
@@ -647,6 +761,7 @@ public partial class App : System.Windows.Application, IAppHost
             // 任务被拍死/删除 → 立刻收起
             _hoverBubble.Tracker.Reset();
             _hoverBubble.Hide();
+            _nameTag?.HideTag();
             return;
         }
 
@@ -747,6 +862,15 @@ public partial class App : System.Windows.Application, IAppHost
 
         // 规格 §15.4：每次 tick（至少每 60 秒）检查一次每周实例。
         EnsureWeeklyTasksTicked(now, force: false);
+
+        // 跨天：连胜必须在零点后立刻校正，否则面板会一直显示昨天的天数。
+        string today = DailyKeys.Today();
+        if (!string.Equals(_lastStreakDay, today, StringComparison.Ordinal))
+        {
+            _lastStreakDay = today;
+            _state.Progress.RefreshStreak(today);
+            MarkDirty();
+        }
 
         // 规格 §14：轮询光标（内部限流到约 10Hz），驱动悬停气泡。
         HoverTick();
@@ -901,8 +1025,12 @@ public partial class App : System.Windows.Application, IAppHost
         _state.SquashedCount = Engine.SquashedCount;
         _sound.PlaySquash();
         Engine.DrainEvents(); // Squashed 由界面直接反馈，不需要通知
-        MarkDirty();
-        RefreshViews();
+
+        // 从任务列表点「完成」= 打卡，但**不发击杀奖励** ——
+        // 金币只来自亲手在桌面上清掉它。两边都算连胜，只是收益不同。
+        string today = DailyKeys.Today();
+        _state.Progress.RegisterCompletion(today);
+        RaiseProgressChanged(today);
     }
 
     public void Delete(string taskId)
@@ -926,15 +1054,131 @@ public partial class App : System.Windows.Application, IAppHost
         Engine.DrainEvents();
         _state.SquashedCount = 0;
         _overlay?.Model.Clear();
+        _overlay?.Bursts.Clear();
+
+        // 注意：清空任务**不重置钱包与勋章**。
+        // 货币是长期积累的元游戏进度，不是任务列表的附属计数 ——
+        // 否则"清空"会变成一种把已花掉的钱再赚一遍的漏洞。
         MarkDirty();
         RefreshViews();
     }
 
-    /// <summary>覆盖层里被「拍」到的虫子。</summary>
-    private void OnCreatureSquashed(string taskId, Stage stage)
+    /// <summary>
+    /// 覆盖层里的一次出手（可能同时拍死好几只）。
+    ///
+    /// 记账顺序是刻意的：**先让引擎真的完成、再发钱**。
+    /// 如果引擎拒绝（任务已不存在 / 已完成），这一只就不产生任何货币 ——
+    /// 这样"点击 → 完成 → 金币"是一条不可能被点空刷出来的链路。
+    /// </summary>
+    private void OnCreaturesSquashed(IReadOnlyList<KillHit> hits)
     {
-        _overlay?.Model.RemoveAt(taskId, stage, _clock.Elapsed.TotalSeconds);
-        Complete(taskId);
+        if (hits.Count == 0) return;
+
+        string today = DailyKeys.Today();
+        int coins = 0;
+        int completed = 0;
+
+        foreach (KillHit hit in hits)
+        {
+            if (!Engine.Complete(hit.TaskId, LifecycleEngine.NowMs(), out _)) continue;
+            coins += _state.Progress.RegisterKill(hit.Stage, today);
+            completed++;
+        }
+
+        if (completed == 0) return;
+
+        _state.SquashedCount = Engine.SquashedCount;
+        Engine.DrainEvents();       // Squashed 由界面直接反馈，不需要通知
+        _sound.PlaySquash();
+
+        SafeWriteLine($"[MaggotTask] 出手：命中 {completed} 只，+{coins} 货币，余额 {_state.Progress.Coins}");
+
+        RaiseProgressChanged(today);
+    }
+
+    /// <summary>
+    /// 进度变化后的统一收口：扫勋章 → 校正连胜 → 落盘 → 刷界面。
+    /// 所有会改计数的地方都必须走这里，否则会出现"界面更新了但存档没更新"。
+    /// </summary>
+    private void RaiseProgressChanged(string today)
+    {
+        List<MedalDef> fresh = _state.Progress.EvaluateMedals(today);
+        _state.Progress.RefreshStreak(today);
+
+        MarkDirty();
+        RefreshViews();
+
+        foreach (MedalDef m in fresh)
+        {
+            if (!_announcedMedals.Add(m.Id)) continue;
+            SafeWriteLine($"[MaggotTask] 解锁勋章：{m.Name}（{m.Description}）");
+            try
+            {
+                _tray.Notify("解锁勋章 · " + m.Name, m.Description);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MaggotTask] 勋章通知失败: {ex.Message}");
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 商店 / 荣誉殿堂
+    // ------------------------------------------------------------------
+
+    public void BuyTool(string toolId)
+    {
+        if (!_state.Progress.Buy(toolId, out string message))
+        {
+            _tray.Notify("军械库", message, warning: true);
+            return;
+        }
+
+        _overlay?.ApplyTool(_state.Progress.EquippedToolDef);
+        MarkDirty();
+        RefreshViews();
+        _tray.Notify("军械库", message);
+        SafeWriteLine($"[MaggotTask] 购买：{toolId} → 余额 {_state.Progress.Coins}");
+    }
+
+    public void EquipTool(string toolId)
+    {
+        if (!_state.Progress.Equip(toolId)) return;
+
+        _overlay?.ApplyTool(_state.Progress.EquippedToolDef);
+        MarkDirty();
+        RefreshViews();
+        SafeWriteLine($"[MaggotTask] 装备：{_state.Progress.EquippedToolDef.Name}");
+    }
+
+    public void OpenShop()
+    {
+        if (_shop is null)
+        {
+            _shop = new ShopWindow(this);
+            ApplyAppIcon(_shop);
+        }
+        ShowUtilityWindow(_shop);
+    }
+
+    public void OpenHonor()
+    {
+        if (_honor is null)
+        {
+            _honor = new HonorWindow(this);
+            ApplyAppIcon(_honor);
+        }
+        _honor.RefreshAll();
+        ShowUtilityWindow(_honor);
+    }
+
+    /// <summary>把工具窗口拉到前台并居中；已开着就只激活。</summary>
+    private static void ShowUtilityWindow(Window w)
+    {
+        if (!w.IsVisible) w.Show();
+        if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
+        w.Activate();
     }
 
     // ------------------------------------------------------------------
@@ -965,6 +1209,9 @@ public partial class App : System.Windows.Application, IAppHost
 
         _persistence.Dispose();
         _tray.Dispose();
+        _nameTag?.Close();
+        _shop?.Close();
+        _honor?.Close();
         _hoverBubble?.Close();
         _overlay?.Close();
 
@@ -1214,6 +1461,156 @@ public partial class App : System.Windows.Application, IAppHost
     // 和 dt 喂给 <see cref="HoverTracker"/>，逐条核对 §14.4 的验收标准，
     // 并检查气泡窗口的 Win32 样式位。跑完立刻退出。
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// --diag-kill：端到端验证「悬停 → 点击 → 记账 → 特效」。
+    ///
+    /// 做三件事：关掉穿透（否则收不到点击）、把一只卵钉在固定坐标（卵完全静止，
+    /// 不会被 Update 挪走）、打印坐标供外部脚本把鼠标移过去。25 秒后打印结束快照并退出。
+    /// </summary>
+    private void RunKillDiagnostics()
+    {
+        if (_overlay is null)
+        {
+            ExitApp();
+            return;
+        }
+
+        _state.Config.ClickThrough = false;
+        _overlay.ApplyClickThrough(false);
+
+        const double targetX = 500.0;
+        const double targetY = 430.0;
+
+        CreatureVisual? pinned = FindEgg();
+        if (pinned is null)
+        {
+            SeedSyntheticTasks(4, "egg");
+            _overlay.Model.Sync(Engine.Snapshot(), _clock.Elapsed.TotalSeconds);
+            pinned = FindEgg();
+        }
+
+        if (pinned is null)
+        {
+            SafeWriteLine("[diag-kill] 找不到可用的卵，退出。");
+            ExitApp();
+            return;
+        }
+
+        pinned.Position = new Point(targetX, targetY);
+        pinned.SpawnProgress = 1.0;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("[diag-kill] 端到端击杀验证");
+        sb.AppendLine($"KILL_TARGET={targetX:0},{targetY:0}   （覆盖层本地坐标 = 虚拟桌面 DIP 坐标）");
+        sb.AppendLine($"装备={_state.Progress.EquippedToolDef.Name}  穿透={_overlay.IsClickThroughEffective()}");
+        sb.AppendLine($"初始 货币={_state.Progress.Coins}  击杀={_state.Progress.TotalKills}  连胜={_state.Progress.CurrentStreak}");
+        SafeWriteLine(sb.ToString());
+
+        var killer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromSeconds(25),
+        };
+        killer.Tick += (_, _) =>
+        {
+            killer.Stop();
+            var end = new StringBuilder();
+            end.AppendLine("[diag-kill] 结束快照");
+            end.AppendLine($"命中 / 空挥 / 冷却跳过 = {_overlay.TotalHits} / {_overlay.MissClicks} / {_overlay.CooldownSkips}");
+            end.AppendLine($"货币={_state.Progress.Coins}  击杀={_state.Progress.TotalKills}  卵={_state.Progress.KillsEgg}");
+            end.AppendLine($"任务完成={_state.Progress.TasksCompleted}  连胜={_state.Progress.CurrentStreak}  勋章={_state.Progress.UnlockedMedalCount}");
+            end.AppendLine($"特效元素={_overlay.Bursts.ElementCount}  剩余生物={_overlay.Model.Count}");
+            SafeWriteLine(end.ToString());
+            ExitApp();
+        };
+        killer.Start();
+    }
+
+    private CreatureVisual? FindEgg()
+    {
+        if (_overlay is null) return null;
+        foreach (CreatureVisual c in _overlay.Model.Creatures)
+        {
+            if (c.Stage == Stage.Egg) return c;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// --diag-game：打印元游戏数值快照，并把军械库 / 荣誉殿堂并排打开，
+    /// 停留 30 秒供人工核对（或截图存档），然后正常退出。
+    /// </summary>
+    private void RunGameDiagnostics()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("═══ 元游戏诊断（货币 / 商店 / 连胜 / 勋章）═══");
+        sb.AppendLine($"时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine();
+
+        GameProgress p = _state.Progress;
+        sb.AppendLine($"货币余额        : {p.Coins}");
+        sb.AppendLine($"累计获得/支出   : {p.TotalCoinsEarned} / {p.TotalSpent}");
+        sb.AppendLine($"累计击杀        : {p.TotalKills}（卵 {p.KillsEgg} · 蛆 {p.KillsLarva} · 蛹 {p.KillsPupa} · 苍蝇 {p.KillsFly}）");
+        sb.AppendLine($"完成任务        : {p.TasksCompleted}");
+        sb.AppendLine($"连胜            : 当前 {p.CurrentStreak} 天 · 最长 {p.BestStreak} 天 · 热度 {p.HeatLevel}（{p.HeatLabel}）");
+        sb.AppendLine($"最近活跃日      : {(p.LastActiveDate.Length == 0 ? "(从未)" : p.LastActiveDate)}");
+        sb.AppendLine($"今日            : 击杀 {p.DayOrEmpty(DailyKeys.Today()).Kills} · 入账 {p.DayOrEmpty(DailyKeys.Today()).Coins}");
+        sb.AppendLine($"勋章            : {p.UnlockedMedalCount}/{GameProgress.MedalCatalog.Count}");
+        sb.AppendLine($"装备            : {p.EquippedToolDef.Name}（{p.EquippedToolDef.Id}）");
+        sb.AppendLine($"已拥有          : {string.Join(", ", p.OwnedTools)}");
+        sb.AppendLine();
+
+        sb.AppendLine("── 价格与命中形状 ──");
+        foreach (ToolDef t in ToolCatalog.All)
+        {
+            sb.AppendLine($"  {t.Name,-8} 价格 {t.Price,6} · {t.Shape,-6} · 冷却 {t.CooldownSeconds:0.00}s" +
+                          (p.Owns(t.Id) ? " · 已拥有" : string.Empty));
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("── 光标 ──");
+        foreach (ToolDef t in ToolCatalog.All)
+        {
+            Cursor? cur = CursorFactory.ForTool(t.Id);
+            sb.AppendLine($"  {t.Name,-8} : {(cur is null ? "生成失败（会退回箭头）" : "OK")}");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("── 运行态 ──");
+        sb.AppendLine($"  虫群生物数    : {_overlay?.Model.Count ?? 0}");
+        sb.AppendLine($"  当前工具      : {_overlay?.CurrentTool.Name}");
+        sb.AppendLine($"  累计命中/空挥/冷却跳过 : {_overlay?.TotalHits} / {_overlay?.MissClicks} / {_overlay?.CooldownSkips}");
+        SafeWriteLine(sb.ToString());
+
+        OpenShop();
+        if (_shop is not null)
+        {
+            _shop.Left = 70;
+            _shop.Top = 60;
+        }
+
+        OpenHonor();
+        if (_honor is not null)
+        {
+            _honor.Left = 650;
+            _honor.Top = 40;
+        }
+
+        // 截图/人工核对时把控制面板收起来，避免压住军械库左栏。
+        _panel?.Hide();
+
+        var killer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromSeconds(30),
+        };
+        killer.Tick += (_, _) =>
+        {
+            killer.Stop();
+            SafeWriteLine("[diag-game] 30 秒到，退出。");
+            ExitApp();
+        };
+        killer.Start();
+    }
 
     private void RunHoverDiagnostics()
     {
@@ -1671,7 +2068,7 @@ public partial class App : System.Windows.Application, IAppHost
                 report.AppendLine();
                 report.AppendLine("── 渲染 ──");
                 report.AppendLine($"虫群生物数: {_overlay.Model.Count}");
-                report.AppendLine($"爆浆粒子非空: {!_overlay.Model.Splats.IsEmpty}");
+                report.AppendLine($"消除特效非空: {!_overlay.Bursts.IsEmpty}");
                 report.AppendLine($"最近一帧耗时: {_overlay.LastFrameMs:0.00} ms");
                 report.AppendLine($"平均绘制耗时: {_overlay.AverageFrameMs:0.00} ms/帧（共 {_overlay.FrameCount} 帧）");
                 report.AppendLine($"中位绘制耗时: {_overlay.MedianFrameMs:0.00} ms/帧  P95: {_overlay.P95FrameMs:0.00} ms/帧");
@@ -2042,19 +2439,20 @@ public partial class App : System.Windows.Application, IAppHost
 
         try
         {
-            // 制造几坨爆浆，连同生物一起进画面
+            // 制造几团消除特效，连同生物一起进画面
             Stage[] stages = { Stage.Egg, Stage.Larva, Stage.Pupa, Stage.Fly };
             int spawned = 0;
             foreach (CreatureVisual c in _overlay.Model.Creatures)
             {
                 if (spawned >= 4) break;
-                _overlay.Model.Splats.Spawn(
+                _overlay.Bursts.Spawn(
                     new Point(c.Position.X + 70, c.Position.Y + 70),
                     stages[spawned % stages.Length],
+                    ToolCatalog.RewardFor(stages[spawned % stages.Length]),
                     _clock.Elapsed.TotalSeconds);
                 spawned++;
             }
-            _overlay.Model.Splats.Update(_clock.Elapsed.TotalSeconds, 0.016);
+            _overlay.Bursts.Update(_clock.Elapsed.TotalSeconds, 0.016);
 
             var root = (FrameworkElement)_overlay.Content;
             double dip = System.Windows.Media.VisualTreeHelper.GetDpi(root).PixelsPerDip;

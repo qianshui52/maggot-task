@@ -36,6 +36,19 @@ public sealed class HoverTracker
     private string? _hoveredId;
     private double _dwell;
     private bool _shown;
+    private readonly double _dwellSeconds;
+
+    /// <summary>
+    /// 默认 3 秒（规格 §14）。悬停名牌用 0.18 秒 —— 同一条驻留逻辑，
+    /// 只是触发阈值不同，不需要第二套实现。
+    /// </summary>
+    public HoverTracker(double dwellSeconds = DwellSeconds)
+    {
+        _dwellSeconds = Math.Max(0, dwellSeconds);
+    }
+
+    /// <summary>本实例的触发阈值（秒）。</summary>
+    public double DwellTarget => _dwellSeconds;
 
     /// <summary>当前驻留计时（秒）。诊断用。</summary>
     public double Dwell => _dwell;
@@ -101,7 +114,7 @@ public sealed class HoverTracker
         }
 
         bool newlyShown = false;
-        if (!_shown && _dwell >= DwellSeconds)
+        if (!_shown && _dwell >= _dwellSeconds)
         {
             _shown = true;
             ShowCount++;
