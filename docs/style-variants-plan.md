@@ -195,7 +195,7 @@ Windows 走 `App` 的 `RefreshViews()` 既有广播）。
 
 1. 单元/自测：Android 53 单测（+2 风格断言）、Windows SelfTest 527（+约 6 条风格断言）全绿。
 2. 视觉：Windows `--style=realistic --stage=fly` 截图；Android `adb shell screencap` 三档尺寸各一张。
-3. 性能：`--diag-fps` 在 140 只生物下对比两种风格，记录到 `D:\dev\logs\` 并在交付里附数字。
+3. 性能：`--diag-fps` 在 140 只生物下对比两种风格，记录到 `logs/` 并在交付里附数字。
 4. 回归：切风格 20 次后确认无内存增长（Android Bitmap 缓存要设上限，超限 LRU 淘汰）。
 
 ## 9. 风险与对策
