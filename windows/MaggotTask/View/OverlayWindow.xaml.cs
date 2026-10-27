@@ -26,6 +26,15 @@ public partial class OverlayWindow : Window
     private bool _reduceMotion;
     private bool _clickThrough = true;
 
+    /// <summary>
+    /// 用户在面板上设定的"穿透"意图。
+    /// 实际是否穿透 = 这个意图 且 没有因为光标悬到虫子上而临时接管。
+    /// </summary>
+    private bool _manualClickThrough = true;
+
+    /// <summary>当前是否因为"光标正压在虫子上"而临时接管了点击。</summary>
+    private bool _autoCapturing;
+
     private ToolDef _tool = ToolCatalog.Swatter;
     private double _lastAttackAt = double.NegativeInfinity;
 
@@ -236,13 +245,31 @@ public partial class OverlayWindow : Window
         _model.Bounds = new Rect(0, 0, Width, Height);
     }
 
-    /// <summary>运行时开关鼠标穿透。</summary>
+    /// <summary>运行时设置"穿透"意图（面板开关）。会先清掉自动接管状态。</summary>
     public void ApplyClickThrough(bool clickThrough)
     {
-        _clickThrough = clickThrough;
+        _manualClickThrough = clickThrough;
+        _autoCapturing = false;
+        ApplyEffectiveClickThrough();
+    }
+
+    /// <summary>
+    /// 按「用户意图 + 自动接管」算出实际穿透状态，变化时才动 Win32 样式位。
+    ///
+    /// 为什么需要自动接管：穿透开着时窗口根本不参与命中测试，**收不到鼠标事件**，
+    /// 光标也轮不到我们设置（由下层窗口决定），所以"悬停变苍蝇拍、点击拍死"全都不成立。
+    /// 但让用户先手动关掉穿透又太隐蔽 —— 于是改成：光标压到虫子身上时临时撤销穿透，
+    /// 离开后立刻恢复。中间态只有几十毫秒，用户感知就是"靠近就能拍"。
+    /// </summary>
+    private void ApplyEffectiveClickThrough()
+    {
+        bool desired = _manualClickThrough && !_autoCapturing;
+        if (desired == _clickThrough) return;
+
+        _clickThrough = desired;
         try
         {
-            WindowStyles.ApplyOverlayStyles(this, clickThrough);
+            WindowStyles.ApplyOverlayStyles(this, desired);
         }
         catch (Exception ex)
         {
@@ -250,6 +277,43 @@ public partial class OverlayWindow : Window
         }
         UpdateCursor();
     }
+
+    /// <summary>
+    /// 每帧调用：光标是否压在虫子上。
+    ///
+    /// 用**两档半径**做滞回（进入 1.7、离开 2.2）：否则光标停在判定边缘时
+    /// 会一帧接管一帧放行，光标形状和点击归属跟着抖。
+    /// </summary>
+    /// <returns>当前是否处于自动接管状态。</returns>
+    public bool UpdateCapture(Point cursorLocal)
+    {
+        // 用户已经手动关掉穿透 → 全程接管，不需要再做局部判断
+        if (!_manualClickThrough)
+        {
+            if (_autoCapturing)
+            {
+                _autoCapturing = false;
+                ApplyEffectiveClickThrough();
+            }
+            return false;
+        }
+
+        double scale = _autoCapturing ? 2.2 : 1.7;
+        bool over = _model.HitTestAny(cursorLocal, scale);
+
+        if (over != _autoCapturing)
+        {
+            _autoCapturing = over;
+            ApplyEffectiveClickThrough();
+        }
+        return _autoCapturing;
+    }
+
+    /// <summary>面板上的穿透意图（诊断用）。</summary>
+    public bool ManualClickThrough => _manualClickThrough;
+
+    /// <summary>是否正因悬停而临时接管（诊断用）。</summary>
+    public bool AutoCapturing => _autoCapturing;
 
     /// <summary>
     /// 换装备。光标与范围立即生效；冷却按新工具重新计算（不会卡着旧冷却）。

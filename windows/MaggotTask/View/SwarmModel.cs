@@ -182,6 +182,13 @@ public sealed class SwarmModel
     /// </summary>
     private void UpdateFly(CreatureVisual c, double now, double dt, bool reduceMotion)
     {
+        if (c.Pinned)
+        {
+            // 诊断用：钉住不飞（否则点下去时它已经飞走了）
+            c.Velocity = new Vector(0, 0);
+            return;
+        }
+
         double speed = 70.0 + 60.0 * c.Intensity;
         if (reduceMotion)
         {
@@ -275,7 +282,12 @@ public sealed class SwarmModel
         {
             // 判定中心用 HitCenter 而不是 Position：蛆的 Position 是头部。
             Point center = c.HitCenter;
-            double r = c.Size * 0.85 * radiusScale;
+
+            // 苍蝇以 70–130 px/s 乱飞、还会冲刺，等鼠标按下的那几十毫秒里就位移了。
+            // 给它 20% 的判定加成：仍然是"最难打的阶段"，但不至于明明点上了却判空。
+            double stageBoost = c.Stage == Stage.Fly ? 1.20 : 1.0;
+
+            double r = c.Size * 0.85 * radiusScale * stageBoost;
             double dx = center.X - p.X;
             double dy = center.Y - p.Y;
             double d2 = dx * dx + dy * dy;
@@ -287,6 +299,25 @@ public sealed class SwarmModel
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// 光标下有没有任何生物（用于"悬停自动接管点击"）。
+    /// 与 <see cref="HitTest"/> 的区别：只回答有/没有，不挑最近的一只，也不排序。
+    /// </summary>
+    public bool HitTestAny(Point p, double radiusScale = 1.7)
+    {
+        foreach (CreatureVisual c in _creatures.Values)
+        {
+            Point center = c.HitCenter;
+            // 与 HitTest 保持同一套加成，否则会出现"接管了却打不中"的窄缝。
+            double stageBoost = c.Stage == Stage.Fly ? 1.20 : 1.0;
+            double r = c.Size * 0.85 * radiusScale * stageBoost;
+            double dx = center.X - p.X;
+            double dy = center.Y - p.Y;
+            if (dx * dx + dy * dy <= r * r) return true;
+        }
+        return false;
     }
 
     /// <summary>

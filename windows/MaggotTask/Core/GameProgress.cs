@@ -222,18 +222,6 @@ public sealed class GameProgress
         return reward;
     }
 
-    /// <summary>
-    /// 登记一次「在任务列表里点完成」——算打卡，但不发击杀奖励。
-    /// 金币的唯一来源是亲手击杀；这条规则两端一致，也让"点完成"和"拍死"各有意义。
-    /// </summary>
-    public void RegisterCompletion(string dateKey)
-    {
-        TasksCompleted++;
-        DayLog log = Day(dateKey);
-        log.Completed++;
-        TouchDay(dateKey);
-    }
-
     private DayLog Day(string dateKey)
     {
         if (!Days.TryGetValue(dateKey, out DayLog? log))

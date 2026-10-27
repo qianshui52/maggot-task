@@ -2919,6 +2919,12 @@ public static class SelfTest
 
         // 空挥：附近什么都没有
         Check("空白处出手命中 0 只", model.CollectHits(ToolCatalog.Swatter, new Point(1100, 850)).Count == 0);
+
+        // 悬停接管区域（HitTestAny）：比击杀半径略宽，用于"光标压到虫子上就接管点击"
+        Check("悬停接管：压在生物身上判定为真", model.HitTestAny(new Point(102, 301)));
+        Check("悬停接管：空白处判定为假", !model.HitTestAny(new Point(1100, 850)));
+        Check("悬停接管半径比击杀半径宽",
+            model.HitTestAny(new Point(100, 255), 1.7) && !model.CollectHits(ToolCatalog.Swatter, new Point(100, 255)).Any());
     }
 
     // ==================================================================

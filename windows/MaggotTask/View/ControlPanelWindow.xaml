@@ -295,7 +295,7 @@
                     </Grid.ColumnDefinitions>
                     <CheckBox Grid.Column="0" Content="穿透" Style="{StaticResource ToggleSwitch}"
                               IsChecked="{Binding ClickThrough, Mode=TwoWay}"
-                              ToolTip="关闭后虫群层吃掉点击，可以直接拍" />
+                              ToolTip="开启时虫群不会挡住桌面点击；光标移到虫子身上会自动临时接管，直接点就能拍死。关闭则全程接管。" />
                     <CheckBox Grid.Column="1" Content="音效" Style="{StaticResource ToggleSwitch}"
                               IsChecked="{Binding SoundEnabled, Mode=TwoWay}"
                               ToolTip="程序化合成的音效；打开时会立刻试听一次「拍死」" />

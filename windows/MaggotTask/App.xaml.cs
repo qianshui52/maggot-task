@@ -891,6 +891,10 @@ public partial class App : System.Windows.Application, IAppHost
         // 规格 §14：轮询光标（内部限流到约 10Hz），驱动悬停气泡。
         HoverTick();
 
+        // 光标压到虫子身上时临时接管点击 —— 否则穿透开着就永远收不到鼠标事件，
+        // 苍蝇拍既不显示也拍不死。这一句是"悬停即武器"的关键。
+        _overlay?.UpdateCapture(CurrentCursorLocal());
+
         // 规格 §14.3：暂停时生物不动，悬停依然有效 —— 所以这里**不**判断 Running。
 
         if (now >= _nextTrayUpdate)
@@ -1034,18 +1038,32 @@ public partial class App : System.Windows.Application, IAppHost
         RefreshViews();
     }
 
+    /// <summary>
+    /// 完成一个任务（任务列表里的「完成」按钮）。
+    ///
+    /// 记账口径与桌面击杀**完全一致**：先让引擎真的完成，再按任务当时的阶段发货币。
+    /// （1.3.2 之前这里只记打卡不发钱，用户反馈"点了六个完成，货币一分没动"——
+    /// 那是把"亲手击杀"和"完成任务"当成了两件事，属于设计失误，已统一。）
+    ///
+    /// 阶段必须在 <see cref="LifecycleEngine.Complete"/> **之前**取：
+    /// 完成之后 Status=Done，<see cref="LifecycleEngine.StageOf"/> 只会返回 Dead（奖励 0）。
+    /// </summary>
     public void Complete(string taskId)
     {
+        TaskItem? task = Engine.FindById(taskId);
+        if (task is null) return;
+
+        Stage stage = LifecycleEngine.StageOf(task);
         if (!Engine.Complete(taskId, LifecycleEngine.NowMs(), out _)) return;
 
         _state.SquashedCount = Engine.SquashedCount;
         _sound.PlaySquash();
         Engine.DrainEvents(); // Squashed 由界面直接反馈，不需要通知
 
-        // 从任务列表点「完成」= 打卡，但**不发击杀奖励** ——
-        // 金币只来自亲手在桌面上清掉它。两边都算连胜，只是收益不同。
         string today = DailyKeys.Today();
-        _state.Progress.RegisterCompletion(today);
+        int reward = _state.Progress.RegisterKill(stage, today);
+        SafeWriteLine($"[MaggotTask] 列表完成：{stage.Label()} → +{reward} 货币，余额 {_state.Progress.Coins}");
+
         RaiseProgressChanged(today);
     }
 
@@ -1478,21 +1496,23 @@ public partial class App : System.Windows.Application, IAppHost
     // 并检查气泡窗口的 Win32 样式位。跑完立刻退出。
     // ------------------------------------------------------------------
 
-    /// <summary>诊断：造一批不同阶段的战果，然后打开任务列表供人工核对标本缸。</summary>
+    /// <summary>诊断：造一批不同阶段的战果（走 App.Complete，与用户点「完成」同一条路径），然后打开任务列表。</summary>
     private void RunListDiagnostics()
     {
+        int coinsBefore = _state.Progress.Coins;
         int killed = 0;
         foreach (TaskItem t in Engine.Snapshot())
         {
-            if (killed >= 16) break;
-            if (Engine.Complete(t.Id, LifecycleEngine.NowMs(), out _)) killed++;
+            if (killed >= 6) break;
+            if (t.Status == TaskStatus.Done) continue;   // 已完成的再点只会被引擎拒绝
+            Complete(t.Id);
+            killed++;
         }
-        Engine.DrainEvents();
-        MarkDirty();
-        RefreshViews();
+
+        SafeWriteLine($"[diag-list] 列表完成 {killed} 个 · 货币 {coinsBefore} → {_state.Progress.Coins}" +
+                      $"（增加 {_state.Progress.Coins - coinsBefore}）");
 
         OpenTaskList();
-        SafeWriteLine($"[diag-list] 已造 {killed} 条战果，打开任务列表。");
 
         // 标本缸在页面最下方：等布局完成再滚到底，方便截图核对。
         var scroller = new DispatcherTimer(DispatcherPriority.Background)
@@ -1533,9 +1553,7 @@ public partial class App : System.Windows.Application, IAppHost
             return;
         }
 
-        _state.Config.ClickThrough = false;
-        _overlay.ApplyClickThrough(false);
-
+        // 刻意**不**关穿透：要验证的正是「穿透开着时，悬停能否自动接管并换成武器」。
         const double targetX = 500.0;
         const double targetY = 430.0;
 
@@ -1577,9 +1595,19 @@ public partial class App : System.Windows.Application, IAppHost
         striker.Tick += (_, _) =>
         {
             striker.Stop();
-            int hits = _overlay.AttackAt(new Point(targetX, targetY));
+            var target = new Point(targetX, targetY);
+
+            // 先验证"悬停自动接管"：穿透意图仍是开，但光标压在虫子上应当临时撤销穿透。
+            bool captured = _overlay.UpdateCapture(target);
+            var hover = new StringBuilder();
+            hover.AppendLine($"[diag-kill] 模拟悬停 @({targetX:0},{targetY:0})");
+            hover.AppendLine($"  面板穿透意图={_overlay.ManualClickThrough}  自动接管={captured}" +
+                             $"  实际穿透={_overlay.ClickThroughField}  Win32穿透={_overlay.IsClickThroughEffective()}");
+            SafeWriteLine(hover.ToString());
+
+            int hits = _overlay.AttackAt(target);
             var after = new StringBuilder();
-            after.AppendLine($"[diag-kill] 程序内出手 @({targetX:0},{targetY:0}) → 命中 {hits} 只");
+            after.AppendLine($"[diag-kill] 程序内出手 → 命中 {hits} 只");
             AppendPinnedState(after);
             SafeWriteLine(after.ToString());
         };
