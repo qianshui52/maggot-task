@@ -163,6 +163,8 @@ public sealed class SwarmModel
     /// <summary>蛆：几乎不动，6 px/s 缓慢拱行，碰到边缘折返。</summary>
     private static void UpdateLarva(CreatureVisual c, double now, double dt, bool reduceMotion)
     {
+        if (c.Pinned) return;   // 诊断用：钉住不动
+
         double speed = reduceMotion ? 0.0 : 6.0;
 
         // 朝向随机缓慢改变
@@ -263,7 +265,7 @@ public sealed class SwarmModel
         }
     }
 
-    /// <summary>命中判定：找出点(px,py)下方的苍蝇（用于「拍死」）。</summary>
+    /// <summary>命中判定：找出点(px,py)下方的生物（用于「拍死」）。</summary>
     public CreatureVisual? HitTest(Point p, double radiusScale = 1.35)
     {
         CreatureVisual? best = null;
@@ -271,9 +273,11 @@ public sealed class SwarmModel
 
         foreach (CreatureVisual c in _creatures.Values)
         {
+            // 判定中心用 HitCenter 而不是 Position：蛆的 Position 是头部。
+            Point center = c.HitCenter;
             double r = c.Size * 0.85 * radiusScale;
-            double dx = c.Position.X - p.X;
-            double dy = c.Position.Y - p.Y;
+            double dx = center.X - p.X;
+            double dy = center.Y - p.Y;
             double d2 = dx * dx + dy * dy;
             if (d2 <= r * r && d2 < bestDist)
             {
@@ -312,7 +316,7 @@ public sealed class SwarmModel
                 double r2 = tool.Radius * tool.Radius;
                 foreach (CreatureVisual c in _creatures.Values)
                 {
-                    if (DistanceSquared(c.Position, p) <= r2 + HalfExtentSquared(c)) hits.Add(c);
+                    if (DistanceSquared(c.HitCenter, p) <= r2 + HalfExtentSquared(c)) hits.Add(c);
                 }
                 break;
             }
@@ -323,8 +327,9 @@ public sealed class SwarmModel
                 double half = tool.Width;
                 foreach (CreatureVisual c in _creatures.Values)
                 {
-                    double dx = Math.Abs(c.Position.X - p.X);
-                    double dy = Math.Abs(c.Position.Y - p.Y);
+                    Point center = c.HitCenter;
+                    double dx = Math.Abs(center.X - p.X);
+                    double dy = Math.Abs(center.Y - p.Y);
                     double pad = c.Size * 0.45;   // 生物自身半径，避免"擦边不算"
 
                     bool horizontal = dx <= reach + pad && dy <= half + pad;
@@ -339,7 +344,7 @@ public sealed class SwarmModel
                 double half = tool.Width;
                 foreach (CreatureVisual c in _creatures.Values)
                 {
-                    if (Math.Abs(c.Position.Y - p.Y) <= half + c.Size * 0.45) hits.Add(c);
+                    if (Math.Abs(c.HitCenter.Y - p.Y) <= half + c.Size * 0.45) hits.Add(c);
                 }
                 break;
             }

@@ -186,6 +186,24 @@ public sealed class LifecycleEngine
         return Stage.Egg;
     }
 
+    /// <summary>
+    /// 只按腐烂度反推阶段，忽略状态。
+    ///
+    /// 用途：已完成的任务 <see cref="StageOf"/> 一律返回 <see cref="Stage.Dead"/>，
+    /// 但「标本缸」需要知道它**当初是被当成什么打死的**。完成时只改了 Status/Progress，
+    /// <see cref="TaskItem.Rot"/> 原样保留，所以能用它还原。
+    ///
+    /// 唯一的偏差：一个 status=Doing 但 rot&lt;HatchT 的任务，当时显示为蛆，
+    /// 这里会算成卵。概率很低（Doing 会加速腐烂），且只影响标本分类不影响任何数值。
+    /// </summary>
+    public static Stage StageFromRot(float rot)
+    {
+        if (rot >= FlyT) return Stage.Fly;
+        if (rot >= PupaT) return Stage.Pupa;
+        if (rot >= HatchT) return Stage.Larva;
+        return Stage.Egg;
+    }
+
     /// <summary>每秒腐烂量（规格第 4 节）。</summary>
     public static double RotRatePerSecond(TaskItem task, MaggotConfig config)
     {

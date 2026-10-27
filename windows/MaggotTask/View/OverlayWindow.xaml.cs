@@ -38,6 +38,27 @@ public partial class OverlayWindow : Window
     /// <summary>空挥次数（点下去但附近没有目标，诊断用）。</summary>
     public int MissClicks { get; private set; }
 
+    /// <summary>
+    /// 窗口实际收到的左键按下次数（诊断用）。
+    /// 与 <see cref="MissClicks"/> 的区别：这个数在"是否穿透"判断**之前**就加一，
+    /// 所以 ClicksSeen = 0 表示鼠标事件根本没到窗口（命中/穿透问题），
+    /// 而 ClicksSeen &gt; 0 且 MissClicks = 0 表示事件到了却被提前 return 掉了。
+    /// </summary>
+    public int ClicksSeen { get; private set; }
+
+    /// <summary>内部穿透标志（诊断用，与 Win32 样式位对照）。</summary>
+    public bool ClickThroughField => _clickThrough;
+
+    /// <summary>
+    /// Win32 层收到的 WM_LBUTTONDOWN 次数（诊断用）。
+    /// 与 <see cref="ClicksSeen"/> 对照即可判断事件丢在哪一层：
+    ///   WmClicks = 0            → 窗口根本没收到消息（被遮挡 / 样式 / 尺寸）
+    ///   WmClicks &gt; ClicksSeen  → 消息到了，但 WPF 命中测试没把它路由成鼠标事件
+    /// </summary>
+    public int WmClicks { get; private set; }
+
+    private const int WM_LBUTTONDOWN = 0x0201;
+
     public OverlayWindow()
     {
         InitializeComponent();
@@ -185,6 +206,18 @@ public partial class OverlayWindow : Window
         {
             Debug.WriteLine($"[MaggotTask] 应用覆盖层扩展样式失败: {ex.Message}");
         }
+
+        // 诊断：在 Win32 层统计左键按下，判断事件丢在消息层还是 WPF 命中测试层。
+        if (PresentationSource.FromVisual(this) is HwndSource source)
+        {
+            source.AddHook(WndProcHook);
+        }
+    }
+
+    private IntPtr WndProcHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_LBUTTONDOWN) WmClicks++;
+        return IntPtr.Zero;
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
@@ -310,28 +343,39 @@ public partial class OverlayWindow : Window
 
     protected override void OnMouseLeftButtonDown(System.Windows.Input.MouseButtonEventArgs e)
     {
+        ClicksSeen++;
         base.OnMouseLeftButtonDown(e);
         if (_clickThrough) return;
 
+        AttackAt(e.GetPosition(this));
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// 在指定点出手一次，返回本次实际命中的数量（0 = 空挥或被冷却拦下）。
+    ///
+    /// 鼠标事件与诊断（--diag-kill）走的是**同一条**路径 —— 这样"人点得中"和
+    /// "测试点得中"不会出现两套逻辑。Win32 命中层不在这里验证（那是窗口样式的事），
+    /// 这里验证的是「几何判定 → 移除 → 特效 → 通知 App 记账」。
+    /// </summary>
+    public int AttackAt(Point p)
+    {
         double now = _clock.Elapsed.TotalSeconds;
 
         // 冷却：同一个工具两次出手之间必须间隔够 —— 否则范围武器可以连续点击刷屏。
         if (_tool.CooldownSeconds > 0 && now - _lastAttackAt < _tool.CooldownSeconds)
         {
             CooldownSkips++;
-            e.Handled = true;
-            return;
+            return 0;
         }
         _lastAttackAt = now;
 
-        Point p = e.GetPosition(this);
         List<CreatureVisual> hits = _model.CollectHits(_tool, p);
 
         if (hits.Count == 0)
         {
             MissClicks++;
-            e.Handled = true;
-            return;
+            return 0;
         }
 
         var payload = new List<KillHit>(hits.Count);
@@ -363,9 +407,8 @@ public partial class OverlayWindow : Window
         }
 
         TotalHits += payload.Count;
-        e.Handled = true;
-
         CreaturesSquashed?.Invoke(payload);
+        return payload.Count;
     }
 
     protected override void OnClosed(EventArgs e)

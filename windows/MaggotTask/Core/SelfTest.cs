@@ -69,6 +69,7 @@ public static class SelfTest
         // ---- v1.3 新增：元游戏（货币 / 商店 / 连胜 / 勋章）----
         GameProgressBehaviour();
         KillGeometryBehaviour();
+        StageFromRotAndHitCenterBehaviour();
         CursorEncodingBehaviour();
 
         Log.AppendLine();
@@ -2918,6 +2919,54 @@ public static class SelfTest
 
         // 空挥：附近什么都没有
         Check("空白处出手命中 0 只", model.CollectHits(ToolCatalog.Swatter, new Point(1100, 850)).Count == 0);
+    }
+
+    // ==================================================================
+    // 标本缸 + 命中中心
+    //
+    // 两条都是"看起来无害、改起来容易踩"的约定：
+    //   · StageFromRot 只在 4 个阈值上分档，改常量就必须同步这里
+    //   · 蛆的 Position 是头部，命中中心必须沿朝向后退；改绘制时不能把这条丢掉
+    // ==================================================================
+
+    private static void StageFromRotAndHitCenterBehaviour()
+    {
+        Section("标本缸：按腐烂度反推阶段");
+
+        Eq("rot 0 → 卵", (int)LifecycleEngine.StageFromRot(0f), (int)Stage.Egg);
+        Eq("rot 略小于 Hatch → 卵", (int)LifecycleEngine.StageFromRot(LifecycleEngine.HatchT - 0.001f), (int)Stage.Egg);
+        Eq("rot 到 Hatch → 蛆", (int)LifecycleEngine.StageFromRot(LifecycleEngine.HatchT), (int)Stage.Larva);
+        Eq("rot 到 Pupa → 蛹", (int)LifecycleEngine.StageFromRot(LifecycleEngine.PupaT), (int)Stage.Pupa);
+        Eq("rot 到 Fly → 苍蝇", (int)LifecycleEngine.StageFromRot(LifecycleEngine.FlyT), (int)Stage.Fly);
+        Eq("rot 超上限 → 仍是苍蝇", (int)LifecycleEngine.StageFromRot(LifecycleEngine.RotMax), (int)Stage.Fly);
+
+        Section("命中中心：蛆的 Position 是头部");
+
+        var larva = new CreatureVisual("hit-larva", 1u)
+        {
+            Stage = Stage.Larva,
+            Position = new Point(100, 100),
+            Heading = 0,               // 朝 +X，身体向 -X 延伸
+        };
+        Check("蛆的命中中心沿朝向后移",
+            larva.HitCenter.X < larva.Position.X - 1.0 && Math.Abs(larva.HitCenter.Y - 100) < 1e-6,
+            $"χ={larva.HitCenter.X:0.##}");
+
+        // 后退量 = 0.42 × Size；Size 随 rot 变化，但方向永远是朝向的反向
+        double distance = Math.Abs(larva.Position.X - larva.HitCenter.X);
+        Near("后退量约为 0.42×Size", distance, 0.42 * larva.Size, 0.01);
+
+        var egg = new CreatureVisual("hit-egg", 2u) { Stage = Stage.Egg, Position = new Point(50, 60) };
+        Check("卵的命中中心就是 Position",
+            egg.HitCenter == egg.Position);
+
+        var fly = new CreatureVisual("hit-fly", 3u)
+        {
+            Stage = Stage.Fly,
+            Position = new Point(10, 20),
+            Heading = 1.0,
+        };
+        Check("苍蝇的命中中心就是 Position", fly.HitCenter == fly.Position);
     }
 
     // ==================================================================

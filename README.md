@@ -19,7 +19,7 @@
 
 | 平台 | 文件 | 前置条件 |
 |:--|:--|:--|
-| Windows 10/11 x64 | [`MaggotTask-Windows-1.3.0.zip`](以上为源代码，想直接体验请查看这个文件夹/MaggotTask-Windows-1.3.0.zip)（0.8 MB） | 需装 [.NET 7 桌面运行时](https://dotnet.microsoft.com/zh-cn/download/dotnet/7.0) |
+| Windows 10/11 x64 | [`MaggotTask-Windows-1.3.1.zip`](以上为源代码，想直接体验请查看这个文件夹/MaggotTask-Windows-1.3.1.zip)（0.8 MB） | 需装 [.NET 7 桌面运行时](https://dotnet.microsoft.com/zh-cn/download/dotnet/7.0) |
 | Android 8.0+ | [`MaggotTask-Android-1.2.10.apk`](以上为源代码，想直接体验请查看这个文件夹/MaggotTask-Android-1.2.10.apk)（7.0 MB） | 允许「未知来源」+ 悬浮窗权限 |
 
 > 详细系统要求、逐步安装说明、以及**两个版本的功能差异**（元游戏目前仅 Windows 有）
@@ -70,9 +70,8 @@
 | 💥 **崩溃自白书** | 万一闪退，下次启动直接把完整堆栈拍你脸上，长按复制即可报修 |
 | ♿ **减少动效适配** | 系统开「减少动态效果」→ 虫子静止但绝不消失（这曾是个 bug，现在写进了测试） |
 
-![军械库 · 荣誉殿堂 · 连胜日历](docs/images/meta-game-shop-honor.png)
-
-<sub>左：军械库 —— 三件进阶工具，价格与命中范围明码标价。右：荣誉殿堂 —— 当前连胜、5 周热力日历、十枚勋章。</sub>
+> 打开控制面板上的「军械库」和「荣誉墙」就能看到：三件进阶工具明码标价，
+> 荣誉殿堂里是当前连胜、5 周热力日历和十枚勋章。
 
 ## 📱 下载
 
@@ -91,7 +90,7 @@
 ### Windows（10/11）
 
 从 [**安装包文件夹**](以上为源代码，想直接体验请查看这个文件夹/) 下载
-`MaggotTask-Windows-1.3.0.zip`，**完整解压**后双击 `MaggotTask.exe`：
+`MaggotTask-Windows-1.3.1.zip`，**完整解压**后双击 `MaggotTask.exe`：
 
 1. 先装 [.NET 7 桌面运行时](https://dotnet.microsoft.com/zh-cn/download/dotnet/7.0)
    （或 `winget install Microsoft.DotNet.DesktopRuntime.7`）；

@@ -3,7 +3,13 @@ using MaggotTask.Core;
 
 namespace MaggotTask.View;
 
-/// <summary>任务列表视图模型：每日 / 每周模板 + 活跃任务 + 「战果」分组（最多 50）。</summary>
+/// <summary>
+/// 任务列表视图模型：每日 / 每周模板 + 活跃任务 + 「标本缸」（已击杀汇总）。
+///
+/// 战果不再逐条列出：清掉多少只都倒进同一口缸里，按阶段分成四格，
+/// 悬停看数量与说明。理由——逐条列出 50 个已完成任务既占地方、也没人看第二遍，
+/// 而"我这周泡了 12 只苍蝇"这件事才有反馈感。
+/// </summary>
 public sealed class TaskListViewModel : ViewModelBase
 {
     private readonly IAppHost _host;
@@ -13,6 +19,11 @@ public sealed class TaskListViewModel : ViewModelBase
     private int _overdue;
     private int _weeklyOverdue;
 
+    private int _specimenEgg;
+    private int _specimenLarva;
+    private int _specimenPupa;
+    private int _specimenFly;
+
     public TaskListViewModel(IAppHost host)
     {
         _host = host;
@@ -20,9 +31,6 @@ public sealed class TaskListViewModel : ViewModelBase
 
     /// <summary>未拍死的任务，按腐烂度降序（最烂的最上面 —— 先救它）。</summary>
     public ObservableCollection<TaskRowViewModel> ActiveRows { get; } = new();
-
-    /// <summary>已拍死：设计系统 §8「最多 50 条」。</summary>
-    public ObservableCollection<TaskRowViewModel> SquashedRows { get; } = new();
 
     /// <summary>每日任务模板（规格 §12）。</summary>
     public ObservableCollection<DailyTemplateRowViewModel> DailyRows { get; } = new();
@@ -32,7 +40,36 @@ public sealed class TaskListViewModel : ViewModelBase
 
     public string HeaderCountText => $"共 {_total} 个 · 苍蝇 {_fly}";
 
-    public string SquashedCountText => $"{_squashed} / {LifecycleEngine.SquashKeep}";
+    /// <summary>标本缸总数（缸盖上那个数字）。</summary>
+    public string SpecimenTotalText => $"共 {_specimenEgg + _specimenLarva + _specimenPupa + _specimenFly} 只";
+
+    public int SpecimenEgg => _specimenEgg;
+    public int SpecimenLarva => _specimenLarva;
+    public int SpecimenPupa => _specimenPupa;
+    public int SpecimenFly => _specimenFly;
+
+    /// <summary>四格的悬停说明。数量为 0 时也说明白，而不是显示空白。</summary>
+    public string SpecimenEggTip => _specimenEgg == 0
+        ? "卵 · 还没泡进去过。趁早清，值 100。"
+        : $"卵 · 标本 {_specimenEgg} 只 · 每只 100 货币";
+
+    public string SpecimenLarvaTip => _specimenLarva == 0
+        ? "蛆 · 缸里还没有。"
+        : $"蛆 · 标本 {_specimenLarva} 只 · 每只 50 货币";
+
+    public string SpecimenPupaTip => _specimenPupa == 0
+        ? "蛹 · 缸里还没有。"
+        : $"蛹 · 标本 {_specimenPupa} 只 · 每只 25 货币";
+
+    public string SpecimenFlyTip => _specimenFly == 0
+        ? "苍蝇 · 还没让它飞起来过。"
+        : $"苍蝇 · 标本 {_specimenFly} 只 · 每只 10 货币";
+
+    /// <summary>缸盖上的总说明（整体悬停）。</summary>
+    public string SpecimenSummaryTip =>
+        $"标本缸 · 累计 {_specimenEgg + _specimenLarva + _specimenPupa + _specimenFly} 只\n" +
+        $"卵 {_specimenEgg} · 蛆 {_specimenLarva} · 蛹 {_specimenPupa} · 苍蝇 {_specimenFly}\n" +
+        $"（只统计最近保留的 {LifecycleEngine.SquashKeep} 条战果）";
 
     /// <summary>每日任务区的标题：模板数 + 逾期实例数（规格 §12.1「已逾期 N 天」标记）。</summary>
     public string DailyHeaderText => DailyRows.Count == 0
@@ -82,7 +119,24 @@ public sealed class TaskListViewModel : ViewModelBase
         }
 
         Sync(ActiveRows, active, todayKey, weekKey);
-        Sync(SquashedRows, done, todayKey, weekKey);
+
+        // ---- 标本缸：只统计，不列条目 ----
+        // 已完成任务的 Rot 保留着完成那一刻的值，用它反推"当初是什么"。
+        int egg = 0, larva = 0, pupa = 0, fly = 0;
+        foreach (TaskItem t in done)
+        {
+            switch (LifecycleEngine.StageFromRot(t.Rot))
+            {
+                case Stage.Egg: egg++; break;
+                case Stage.Larva: larva++; break;
+                case Stage.Pupa: pupa++; break;
+                case Stage.Fly: fly++; break;
+            }
+        }
+        _specimenEgg = egg;
+        _specimenLarva = larva;
+        _specimenPupa = pupa;
+        _specimenFly = fly;
 
         // ---- 每日模板 ----
         IReadOnlyList<DailyTemplate> templates = _host.DailyTemplates();
@@ -130,9 +184,18 @@ public sealed class TaskListViewModel : ViewModelBase
         _squashed = (int)_host.SquashedCount;
 
         Raise(nameof(HeaderCountText));
-        Raise(nameof(SquashedCountText));
         Raise(nameof(FooterText));
         Raise(nameof(HasNoTasks));
+        Raise(nameof(SpecimenTotalText));
+        Raise(nameof(SpecimenEgg));
+        Raise(nameof(SpecimenLarva));
+        Raise(nameof(SpecimenPupa));
+        Raise(nameof(SpecimenFly));
+        Raise(nameof(SpecimenEggTip));
+        Raise(nameof(SpecimenLarvaTip));
+        Raise(nameof(SpecimenPupaTip));
+        Raise(nameof(SpecimenFlyTip));
+        Raise(nameof(SpecimenSummaryTip));
     }
 
     /// <summary>就地更新：同一批 id 不重建，避免列表每 500ms 闪一次。</summary>

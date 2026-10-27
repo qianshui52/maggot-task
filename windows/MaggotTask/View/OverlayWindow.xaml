@@ -16,7 +16,17 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType">
 
-    <!-- 整个虚拟桌面都被这块透明画布覆盖；虫群由 CompositionTarget.Rendering 驱动自绘。 -->
-    <Canvas x:Name="RootCanvas" Background="Transparent" />
+    <!--
+      整个虚拟桌面都被这块透明画布覆盖；虫群由 CompositionTarget.Rendering 驱动自绘。
+
+      ⚠️ Background 必须是 #01000000（alpha = 1/255），不能用 Transparent：
+      分层窗口（WS_EX_LAYERED）的命中测试是**逐像素按 alpha**判定的 ——
+      alpha 为 0 的地方 Windows 认为"这里没有窗口"，鼠标点击会直接穿到下层桌面。
+      结果是：只有正好点在虫子不透明的像素上才收得到点击，点在虫子旁边 1px 就完全没反应，
+      而蛆又是移动的、判定圆心还在头部 —— 用户看到的就是"蛆怎么点都点不死"。
+      给整屏铺一层 alpha=1 的黑色（肉眼不可见），点击才会落在窗口上，
+      再由 SwarmModel.CollectHits 去判定"打没打中"。
+    -->
+    <Canvas x:Name="RootCanvas" Background="#01000000" />
 
 </Window>

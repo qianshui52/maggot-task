@@ -36,6 +36,12 @@ public sealed class CreatureVisual
     public double TwitchAt;
     public double NextTwitchAt;
 
+    /// <summary>
+    /// 诊断用：钉住位置不再移动（--diag-kill 要让目标停在固定坐标上才能稳定点击）。
+    /// 正常运行永远是 false。
+    /// </summary>
+    public bool Pinned;
+
     /// <summary>下一次冲刺的时刻（苍蝇）。</summary>
     public double NextDashAt;
 
@@ -56,4 +62,24 @@ public sealed class CreatureVisual
 
     /// <summary>按帧绘制尺寸。</summary>
     public double Size => BaseSize * SizeScale;
+
+    /// <summary>
+    /// 命中 / 悬停判定用的中心点。
+    ///
+    /// <see cref="Position"/> 字面是"位置"，但画蛆时它是**头部**，身体顺着 <see cref="Heading"/>
+    /// 的反方向延伸约 0.95 × Size。如果判定圆心还留在头部，用户按视觉重心去点身体中段
+    /// 就会偏出半径 —— 所以蛆的判定中心要沿朝向后退到身体中段。
+    /// 卵 / 蛹 / 苍蝇的绘制本来就以 Position 为中心，直接返回即可。
+    /// </summary>
+    public Point HitCenter
+    {
+        get
+        {
+            if (Stage != Stage.Larva) return Position;
+            double back = 0.42 * Size;
+            return new Point(
+                Position.X - Math.Cos(Heading) * back,
+                Position.Y - Math.Sin(Heading) * back);
+        }
+    }
 }

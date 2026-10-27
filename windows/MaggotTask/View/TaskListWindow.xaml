@@ -75,7 +75,7 @@
                 <Border Grid.Row="0" Style="{StaticResource HairLine}" VerticalAlignment="Bottom" Margin="20,0,20,0" />
 
                 <!-- ============ 单一总滚动区（1.2.10 同款教训：一个页面只允许一个滚动面） ============ -->
-                <ScrollViewer Grid.Row="1"
+                <ScrollViewer x:Name="MainScroll" Grid.Row="1"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
@@ -479,43 +479,94 @@
                                    Visibility="{Binding HasNoTasks, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
 
-                <!-- ============ 战果（折叠，最多 50） ============ -->
-                <Expander
-                          Style="{StaticResource MaggotExpander}"
-                          Margin="20,8,20,0"
-                          IsExpanded="False">
-                    <Expander.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="战果" Style="{StaticResource TextH2}"
-                                       Foreground="{StaticResource FgSubtleBrush}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding SquashedCountText}" Style="{StaticResource TextLabel}"
-                                       Margin="8,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Expander.Header>
-                    <ItemsControl ItemsSource="{Binding SquashedRows}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="8,4,8,4" Opacity="{Binding RowOpacity}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Center"
-                                                 Fill="{Binding StageBrush}" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Title}"
-                                                   Style="{StaticResource TextBodyMuted}"
-                                                   Margin="8,0,0,0"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   TextWrapping="NoWrap" />
-                                                <TextBlock Grid.Column="2" Text="{Binding MetaText}"
-                                                           Style="{StaticResource TextLabel}"
-                                                           Margin="8,0,0,0" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                </Expander>
+                <!--
+                  ============ 标本缸 ============
+                  已击杀的虫子**不再逐条列出**：全倒进同一口缸里，按阶段分四格。
+                  数量直接显示，鼠标悬停给出该类的完整说明（以及每只值多少货币）。
+                -->
+                <Border Style="{StaticResource PanelCard}"
+                        Background="{StaticResource SurfaceBrush}"
+                        Margin="20,8,20,0"
+                        Padding="14,12"
+                        ToolTip="{Binding SpecimenSummaryTip}">
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="标本缸" Style="{StaticResource TextH2}"
+                                           Foreground="{StaticResource FgSubtleBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding SpecimenTotalText}"
+                                           Style="{StaticResource TextLabel}"
+                                           Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="悬停看分类"
+                                       Style="{StaticResource TextLabel}"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Background="Transparent"
+                                        ToolTip="{Binding SpecimenEggTip}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{StaticResource EggBrush}" />
+                                    <TextBlock Text="卵" Style="{StaticResource TextLabel}"
+                                               Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SpecimenEgg}"
+                                           Style="{StaticResource TextDataStrong}"
+                                           FontSize="18" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Background="Transparent"
+                                        ToolTip="{Binding SpecimenLarvaTip}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{StaticResource LarvaBrush}" />
+                                    <TextBlock Text="蛆" Style="{StaticResource TextLabel}"
+                                               Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SpecimenLarva}"
+                                           Style="{StaticResource TextDataStrong}"
+                                           FontSize="18" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Background="Transparent"
+                                        ToolTip="{Binding SpecimenPupaTip}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{StaticResource PupaBrush}" />
+                                    <TextBlock Text="蛹" Style="{StaticResource TextLabel}"
+                                               Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SpecimenPupa}"
+                                           Style="{StaticResource TextDataStrong}"
+                                           FontSize="18" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3" Background="Transparent"
+                                        ToolTip="{Binding SpecimenFlyTip}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{StaticResource FlyRimBrush}" />
+                                    <TextBlock Text="苍蝇" Style="{StaticResource TextLabel}"
+                                               Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SpecimenFly}"
+                                           Style="{StaticResource TextDataStrong}"
+                                           FontSize="18" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
                 </StackPanel>
                 </ScrollViewer>
 

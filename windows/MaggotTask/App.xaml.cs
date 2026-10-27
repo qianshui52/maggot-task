@@ -367,6 +367,7 @@ public partial class App : System.Windows.Application, IAppHost
         bool diagFps = e.Args.Any(a => a.Equals("--diag-fps", StringComparison.OrdinalIgnoreCase));
         bool diagGame = e.Args.Any(a => a.Equals("--diag-game", StringComparison.OrdinalIgnoreCase));
         bool diagKill = e.Args.Any(a => a.Equals("--diag-kill", StringComparison.OrdinalIgnoreCase));
+        bool diagList = e.Args.Any(a => a.Equals("--diag-list", StringComparison.OrdinalIgnoreCase));
         bool seedDemo = e.Args.Any(a => a.Equals("--seed-demo", StringComparison.OrdinalIgnoreCase));
         string? stageArg = e.Args.FirstOrDefault(a => a.StartsWith("--stage=", StringComparison.OrdinalIgnoreCase));
 
@@ -422,7 +423,7 @@ public partial class App : System.Windows.Application, IAppHost
         try
         {
             Bootstrap(smoke);
-            if (seedDemo || diagHover || diagGame || diagKill) SeedDemoTasks();
+            if (seedDemo || diagHover || diagGame || diagKill || diagList) SeedDemoTasks();
             if (diagSound) { RunSoundDiagnostics(); ExitApp(); return; }
             if (diagFps)
             {
@@ -457,8 +458,22 @@ public partial class App : System.Windows.Application, IAppHost
             }
             if (diagKill)
             {
-                // 端到端验证「悬停 → 点击 → 记账」：把一只卵钉在固定坐标，等外部脚本去点。
-                Dispatcher.BeginInvoke(new Action(RunKillDiagnostics), DispatcherPriority.ApplicationIdle);
+                // 端到端验证「悬停 → 点击 → 记账」：把一只指定阶段的虫子钉在固定坐标。
+                Stage killStage = (stageArg?["--stage=".Length..].Trim().ToLowerInvariant()) switch
+                {
+                    "egg" => Stage.Egg,
+                    "larva" => Stage.Larva,
+                    "pupa" => Stage.Pupa,
+                    _ => Stage.Fly,
+                };
+                Dispatcher.BeginInvoke(new Action(() => RunKillDiagnostics(killStage)),
+                    DispatcherPriority.ApplicationIdle);
+                return;
+            }
+            if (diagList)
+            {
+                // 打开任务列表，供人工核对「标本缸」的呈现（并造一批战果）。
+                Dispatcher.BeginInvoke(new Action(RunListDiagnostics), DispatcherPriority.ApplicationIdle);
                 return;
             }
             if (diagUi) StartUiDiagnostics();
@@ -679,7 +694,8 @@ public partial class App : System.Windows.Application, IAppHost
 
         foreach (CreatureVisual c in _overlay.Model.Creatures)
         {
-            _hoverTargets.Add(new HoverTarget(c.TaskId, c.Position, c.Size));
+            // 与点击共用 HitCenter：蛆的 Position 是头部，悬停也该落在身体中段。
+            _hoverTargets.Add(new HoverTarget(c.TaskId, c.HitCenter, c.Size));
         }
         return _hoverTargets;
     }
@@ -1462,13 +1478,54 @@ public partial class App : System.Windows.Application, IAppHost
     // 并检查气泡窗口的 Win32 样式位。跑完立刻退出。
     // ------------------------------------------------------------------
 
+    /// <summary>诊断：造一批不同阶段的战果，然后打开任务列表供人工核对标本缸。</summary>
+    private void RunListDiagnostics()
+    {
+        int killed = 0;
+        foreach (TaskItem t in Engine.Snapshot())
+        {
+            if (killed >= 16) break;
+            if (Engine.Complete(t.Id, LifecycleEngine.NowMs(), out _)) killed++;
+        }
+        Engine.DrainEvents();
+        MarkDirty();
+        RefreshViews();
+
+        OpenTaskList();
+        SafeWriteLine($"[diag-list] 已造 {killed} 条战果，打开任务列表。");
+
+        // 标本缸在页面最下方：等布局完成再滚到底，方便截图核对。
+        var scroller = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(1.5),
+        };
+        scroller.Tick += (_, _) =>
+        {
+            scroller.Stop();
+            _taskList?.ScrollToBottom();
+        };
+        scroller.Start();
+
+        var killer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromSeconds(25),
+        };
+        killer.Tick += (_, _) =>
+        {
+            killer.Stop();
+            SafeWriteLine("[diag-list] 25 秒到，退出。");
+            ExitApp();
+        };
+        killer.Start();
+    }
+
     /// <summary>
     /// --diag-kill：端到端验证「悬停 → 点击 → 记账 → 特效」。
     ///
     /// 做三件事：关掉穿透（否则收不到点击）、把一只卵钉在固定坐标（卵完全静止，
     /// 不会被 Update 挪走）、打印坐标供外部脚本把鼠标移过去。25 秒后打印结束快照并退出。
     /// </summary>
-    private void RunKillDiagnostics()
+    private void RunKillDiagnostics(Stage stage)
     {
         if (_overlay is null)
         {
@@ -1482,30 +1539,51 @@ public partial class App : System.Windows.Application, IAppHost
         const double targetX = 500.0;
         const double targetY = 430.0;
 
-        CreatureVisual? pinned = FindEgg();
+        CreatureVisual? pinned = FindByStage(stage);
         if (pinned is null)
         {
-            SeedSyntheticTasks(4, "egg");
+            SeedSyntheticTasks(4, stage.ToString().ToLowerInvariant());
             _overlay.Model.Sync(Engine.Snapshot(), _clock.Elapsed.TotalSeconds);
-            pinned = FindEgg();
+            pinned = FindByStage(stage);
         }
 
         if (pinned is null)
         {
-            SafeWriteLine("[diag-kill] 找不到可用的卵，退出。");
+            SafeWriteLine($"[diag-kill] 找不到可用的{stage.Label()}，退出。");
             ExitApp();
             return;
         }
 
         pinned.Position = new Point(targetX, targetY);
         pinned.SpawnProgress = 1.0;
+        pinned.Pinned = true;       // 诊断：钉住不动，否则蛆 6px/s 会漂出点击点
+        _pinnedTaskId = pinned.TaskId;
 
         var sb = new StringBuilder();
         sb.AppendLine("[diag-kill] 端到端击杀验证");
+        sb.AppendLine($"STAGE={stage}");
         sb.AppendLine($"KILL_TARGET={targetX:0},{targetY:0}   （覆盖层本地坐标 = 虚拟桌面 DIP 坐标）");
+        sb.AppendLine($"TASK_ID={pinned.TaskId}");
         sb.AppendLine($"装备={_state.Progress.EquippedToolDef.Name}  穿透={_overlay.IsClickThroughEffective()}");
         sb.AppendLine($"初始 货币={_state.Progress.Coins}  击杀={_state.Progress.TotalKills}  连胜={_state.Progress.CurrentStreak}");
         SafeWriteLine(sb.ToString());
+
+        // 程序内出手一次：绕过 Win32 鼠标注入（远程/虚拟显示器上注入常被拦截），
+        // 直接走与真实点击完全相同的 AttackAt 路径，验证几何 → 移除 → 记账。
+        var striker = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromSeconds(1.5),
+        };
+        striker.Tick += (_, _) =>
+        {
+            striker.Stop();
+            int hits = _overlay.AttackAt(new Point(targetX, targetY));
+            var after = new StringBuilder();
+            after.AppendLine($"[diag-kill] 程序内出手 @({targetX:0},{targetY:0}) → 命中 {hits} 只");
+            AppendPinnedState(after);
+            SafeWriteLine(after.ToString());
+        };
+        striker.Start();
 
         var killer = new DispatcherTimer(DispatcherPriority.Normal)
         {
@@ -1515,23 +1593,47 @@ public partial class App : System.Windows.Application, IAppHost
         {
             killer.Stop();
             var end = new StringBuilder();
-            end.AppendLine("[diag-kill] 结束快照");
-            end.AppendLine($"命中 / 空挥 / 冷却跳过 = {_overlay.TotalHits} / {_overlay.MissClicks} / {_overlay.CooldownSkips}");
+            end.AppendLine($"[diag-kill] 结束快照");
+            end.AppendLine($"Win32 消息 / WPF 事件 / 命中 / 空挥 = {_overlay.WmClicks} / {_overlay.ClicksSeen} / {_overlay.TotalHits} / {_overlay.MissClicks}");
+            end.AppendLine($"穿透标志 内部={_overlay.ClickThroughField}  Win32={_overlay.IsClickThroughEffective()}  Config={_state.Config.ClickThrough}");
             end.AppendLine($"货币={_state.Progress.Coins}  击杀={_state.Progress.TotalKills}  卵={_state.Progress.KillsEgg}");
             end.AppendLine($"任务完成={_state.Progress.TasksCompleted}  连胜={_state.Progress.CurrentStreak}  勋章={_state.Progress.UnlockedMedalCount}");
             end.AppendLine($"特效元素={_overlay.Bursts.ElementCount}  剩余生物={_overlay.Model.Count}");
+            AppendPinnedState(end);
             SafeWriteLine(end.ToString());
             ExitApp();
         };
         killer.Start();
     }
 
-    private CreatureVisual? FindEgg()
+    /// <summary>诊断：目标那只虫子点击后还在不在、对应任务是什么状态。</summary>
+    private void AppendPinnedState(StringBuilder sb)
+    {
+        if (_pinnedTaskId is null)
+        {
+            sb.AppendLine("目标任务: (无)");
+            return;
+        }
+
+        CreatureVisual? pinnedCreature = null;
+        bool inModel = _overlay is not null && _overlay.Model.TryGet(_pinnedTaskId, out pinnedCreature);
+        TaskItem? task = Engine.FindById(_pinnedTaskId);
+        sb.AppendLine($"目标任务: {_pinnedTaskId[..Math.Min(8, _pinnedTaskId.Length)]}" +
+                      $"  仍在虫群={inModel}" +
+                      (pinnedCreature is not null
+                          ? $"  位置={pinnedCreature.Position.X:0},{pinnedCreature.Position.Y:0}  阶段={pinnedCreature.Stage}"
+                          : string.Empty));
+        sb.AppendLine($"引擎状态: {(task is null ? "FindById=null（索引里没有这个 id）" : $"Status={task.Status}  Rot={task.Rot:0.###}")}");
+    }
+
+    private string? _pinnedTaskId;
+
+    private CreatureVisual? FindByStage(Stage stage)
     {
         if (_overlay is null) return null;
         foreach (CreatureVisual c in _overlay.Model.Creatures)
         {
-            if (c.Stage == Stage.Egg) return c;
+            if (c.Stage == stage) return c;
         }
         return null;
     }

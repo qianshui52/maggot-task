@@ -3,13 +3,20 @@
 > 这里只有**能直接装、直接跑**的文件。
 > 源代码在仓库根目录的 `android/` 与 `windows/`，本文件夹不参与构建、也不影响源码。
 
+> **1.3.1 修了什么**（2026-10-27）
+> - **蛆虫点不死**：覆盖层的透明区域会把鼠标点击漏给桌面，只有正好点在虫子实心像素上才收得到；
+>   另外蛆的判定圆心原本留在头部、没跟着身体走。两处都已修。
+> - **战果改为「标本缸」**：卵 / 蛆 / 蛹 / 苍蝇 四类数量汇总展示，不再逐条列出。
+>
+> 已经下过 1.3.0 的，直接换成这里的 1.3.1。
+
 ---
 
 ## 先选你的平台
 
 | 你的设备 | 下载这个文件 | 大小 |
 |:--|:--|--:|
-| Windows 10 / 11 电脑 | **`MaggotTask-Windows-1.3.0.zip`** | 大约 0.8 MB |
+| Windows 10 / 11 电脑 | **`MaggotTask-Windows-1.3.1.zip`** | 大约 0.8 MB |
 | Android 手机（8.0 及以上） | **`MaggotTask-Android-1.2.10.apk`** | 大约 7.0 MB |
 
 > 在仓库页面点进本文件夹，点文件名右侧的 **Download** 图标即可下载；
@@ -17,7 +24,7 @@
 
 ---
 
-## Windows 版 · 1.3.0
+## Windows 版 · 1.3.1
 
 **系统要求**
 
@@ -40,7 +47,7 @@ winget install Microsoft.DotNet.DesktopRuntime.7
 
 **第二步：解压**
 
-把 `MaggotTask-Windows-1.3.0.zip` **完整解压到一个文件夹**（例如 `D:\MaggotTask\`）。
+把 `MaggotTask-Windows-1.3.1.zip` **完整解压到一个文件夹**（例如 `D:\MaggotTask\`）。
 
 ⚠️ **不要在压缩包里直接双击 exe** —— 那样 exe 找不到旁边的 `MaggotTask.dll`，会启动失败。
 
@@ -99,7 +106,7 @@ winget install Microsoft.DotNet.DesktopRuntime.7
 
 这一点必须先说清楚，避免你下了之后觉得"怎么没有"：
 
-| 功能 | Windows 1.3.0 | Android 1.2.10 |
+| 功能 | Windows 1.3.1 | Android 1.2.10 |
 |:--|:--:|:--:|
 | 四阶段腐烂 / 苍蝇繁殖 / 每日每周任务 | ✅ | ✅ |
 | 悬浮虫群、点击击杀 | ✅ | ✅ |
@@ -120,17 +127,18 @@ MaggotTask-Android-<版本号>.apk      Android 安装包
 ```
 
 - 版本号与源码里的 `versionName` / `csproj <Version>` 一致；
-- 每次发版**新增**文件，不覆盖旧文件，方便回退对比。
+- 正常发版**新增**文件、保留旧版本，方便回退对比；
+- **修 bug 的补丁会直接替换同平台的旧文件**——不把有缺陷的构建留在仓库里让人误下。
 
 ## 校验值（SHA-256 前 16 位）
 
 | 文件 | SHA-256 |
 |:--|:--|
-| `MaggotTask-Windows-1.3.0.zip` | `e3d55535d52b4ec3…` |
+| `MaggotTask-Windows-1.3.1.zip` | `ccaab393059def55…` |
 | `MaggotTask-Android-1.2.10.apk` | `f93b6b68087111b8…` |
 
 完整校验：
 
 ```powershell
-Get-FileHash .\MaggotTask-Windows-1.3.0.zip -Algorithm SHA256
+Get-FileHash .\MaggotTask-Windows-1.3.1.zip -Algorithm SHA256
 ```

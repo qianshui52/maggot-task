@@ -242,6 +242,9 @@ public partial class TaskListWindow : Window
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Hide();
 
+    /// <summary>滚到底部（诊断用：标本缸在页面最下方，截图前需要把它滚出来）。</summary>
+    public void ScrollToBottom() => MainScroll.ScrollToEnd();
+
     // ------------------------------------------------------------------
     // 窗口适配 + Esc 收起
     // ------------------------------------------------------------------
